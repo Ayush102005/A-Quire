@@ -8,73 +8,93 @@ The core innovation lies in the Struggle Detection Algorithm, which differentiat
 
 ## System Architecture
 
-### 3-Layer Architecture
+### 4-Layer Architecture
 
 ```mermaid
 graph TB
-    subgraph "Perception Layer"
-        A[Webcam Feed] --> B[MediaPipe Face Mesh]
-        B --> C[Iris Tracking]
-        B --> D[Facial Landmark Detection]
-        C --> E[Gaze Coordinate Estimator]
-        D --> E
-        E --> F[Temporal Buffer]
+    subgraph "Vision & Frontend Layer (Edge-AI / Client)"
+        A[Browser Webcam] --> B[MediaPipe Iris WASM]
+        B --> C[478 3D Landmarks + Iris Depth]
+        C --> D[TensorFlow.js Coordinate Regression]
+        D --> E[Screen x,y Coordinates]
+        E --> F[Zustand Struggle State]
+        F --> G[React 19 + Vite UI]
+        G --> H[React-Player Video Engine]
+        G --> I[Motion Kiro Agent Avatar]
     end
     
-    subgraph "Contextual Layer"
-        G[Screen Capture] --> H[OCR Engine]
-        H --> I[Content Extractor]
-        J[Study Materials PDFs] --> K[Document Processor]
-        K --> L[ChromaDB Vector Store]
-        I --> M[Context Builder]
-        L --> M
-        F --> M
+    subgraph "Reasoning & Intelligence Layer (Cloud Brain)"
+        J[AWS AppSync GraphQL WebSocket] --> K[AWS Lambda Python 3.12]
+        K --> L[LangGraph Memory Manager]
+        L --> M[AWS Bedrock Claude 4.6 Sonnet]
+        M --> N[Extended Thinking 1024 tokens]
+        N --> O[Prompt Caching 2000 tokens]
+        O --> P[Hinglish Socratic Response]
+        P --> Q[Amazon Polly Kajal Voice]
     end
     
-    subgraph "Interaction Layer"
-        M --> N[FastAPI Backend]
-        N --> O[Struggle Classifier]
-        O --> P[RAG Pipeline]
-        P --> Q[AWS Bedrock Claude 3.5]
-        Q --> R[Hinglish Nudge Generator]
-        R --> S[React Frontend / Chrome Extension]
+    subgraph "Infrastructure & Data Layer (Backend)"
+        R[Clerk Auth OTP/Google] --> S[AWS Amplify Gen 2]
+        S --> T[Amazon DynamoDB 24h TTL]
+        S --> U[Amazon S3 Transcripts]
+        T --> V[Anonymized Gaze Data]
     end
     
-    S --> T[Video Player Control]
-    S --> U[Nudge UI Overlay]
+    subgraph "Analytics Layer (Teacher Dashboard)"
+        V --> W[Pandas + NumPy Processing]
+        W --> X[Matplotlib Hexbin Heatmap]
+        X --> Y[Hot Zone Identification]
+    end
+    
+    F --> J
+    Q --> G
+    H --> K
 ```
 
 ### Layer Responsibilities
 
-#### Perception Layer
-- **Purpose**: Capture and process raw gaze data with minimal latency
+#### Vision & Frontend Layer (Edge-AI / Client)
+- **Purpose**: Real-time eye tracking with zero latency and total privacy
 - **Components**:
-  - MediaPipe Face Mesh: 468-point facial landmark detection
-  - Iris Tracking: Precise pupil center localization
-  - Gaze Coordinate Estimator: Maps 3D eye orientation to 2D screen coordinates
-  - Temporal Buffer: Stores last 30 seconds of gaze events for pattern analysis
-- **Performance Target**: < 100ms processing latency per frame
-- **Privacy**: All processing occurs locally, no data transmission
+  - MediaPipe Iris (WASM): 478-point 3D facial landmark + iris depth detection
+  - TensorFlow.js: Coordinate regression model mapping iris landmarks to screen (x,y)
+  - Zustand: Global struggle state management (Confusion vs. Focus)
+  - React 19 Compiler: Optimized rendering for high-frequency gaze data streams
+  - Motion: Non-intrusive Kiro Agent avatar animations
+  - React-Player: YouTube/Vimeo transcript synchronization
+- **Performance Target**: 30-60 FPS on integrated graphics, < 50ms processing latency
+- **Privacy**: 100% local processing in browser, zero biometric data transmission
 
-#### Contextual Layer
-- **Purpose**: Build semantic understanding of study context
+#### Reasoning & Intelligence Layer (Cloud "Brain")
+- **Purpose**: Socratic mentorship with advanced reasoning capabilities
 - **Components**:
-  - OCR Engine: Extracts text from video frames and screen content
-  - Document Processor: Chunks and embeds study materials
-  - ChromaDB Vector Store: Stores embeddings for semantic search
-  - Context Builder: Combines gaze patterns, screen content, and relevant documents
-- **Performance Target**: < 1s for RAG retrieval
-- **Storage**: Local vector database, no cloud storage of study materials
+  - AWS Bedrock Claude 4.6 Sonnet: Extended Thinking (1024-token planning budget)
+  - Prompt Caching: 2,000-token Socratic Persona cached for 90% cost reduction
+  - AWS Lambda (Python 3.12): Serverless orchestration receiving gaze coordinates
+  - LangGraph: Conversation memory tracking recurring struggle patterns
+  - Amazon Polly (Kajal): Neural Hinglish voice synthesis
+- **Performance Target**: < 3s end-to-end from struggle detection to hint generation
+- **Cost Optimization**: Prompt caching + Extended Thinking for quality-cost balance
 
-#### Interaction Layer
-- **Purpose**: Generate and deliver contextual tutoring
+#### Infrastructure & Data Layer (Backend)
+- **Purpose**: Scalable, secure, DPDP Act 2023 compliant infrastructure
 - **Components**:
-  - FastAPI Backend: Orchestrates struggle detection and AI tutoring
-  - Struggle Classifier: Implements temporal analysis algorithm
-  - RAG Pipeline: Retrieves relevant study material passages
-  - AWS Bedrock Claude 3.5: Generates Hinglish explanations
-  - React Frontend: Renders video player and nudge UI
-- **Performance Target**: < 5s end-to-end from struggle detection to nudge display
+  - AWS AppSync (GraphQL): Real-time WebSocket API for instant communication
+  - Amazon DynamoDB: Primary database with 24-hour TTL for automatic data deletion
+  - Clerk: Passwordless authentication (OTP for Indian mobile, Google OAuth)
+  - Amazon S3: JSON transcript storage for AI context retrieval
+  - AWS Amplify Gen 2: GitHub-connected CI/CD pipeline
+- **Performance Target**: < 100ms WebSocket latency for struggle events
+- **Privacy**: Automatic biometric data deletion after 24 hours via DynamoDB TTL
+
+#### Analytics Layer (Teacher's Dashboard)
+- **Purpose**: Research insights for major project evaluation
+- **Components**:
+  - Pandas + NumPy: Anonymized gaze pattern data processing
+  - Matplotlib/Seaborn: Hexbin heatmap visualization
+  - Hot Zone Detection: Identifies video regions where multiple students struggle (>10s)
+- **Performance Target**: Batch processing of session data for weekly reports
+- **Privacy**: Only anonymized (x,y,duration) tuples, no student identification
 
 ## Struggle Detection Algorithm
 
@@ -260,300 +280,511 @@ def classify_gaze_event(temporal_buffer, current_event):
 
 ## Tech Stack
 
-### Frontend
-- **React 18**: UI framework for video player and nudge overlay
-- **Chrome Extension**: Browser integration for web-based video platforms
-- **Tailwind CSS**: Styling for empathetic, non-intrusive UI
-- **Video.js**: HTML5 video player with custom controls
+### 1. Vision & Frontend Layer (Edge-AI / Client)
+This layer handles real-time eye tracking 100% locally in the browser for zero latency and total privacy.
 
-### Backend
-- **FastAPI**: Async Python web framework for low-latency API
-- **Python 3.11+**: Core language for all processing
-- **Uvicorn**: ASGI server for FastAPI
+- **React 19 + Vite 6.0**: Core framework with React Compiler for optimized rendering of high-frequency gaze data
+- **TypeScript 5.x**: Strict typing for Landmark and Coordinate streams
+- **MediaPipe Iris (WASM)**: Extracts 478 3D landmarks and iris depth at 30-60 FPS
+- **TensorFlow.js 4.22+**: Maps raw 3D iris landmarks to precise screen (x,y) coordinates
+- **Zustand 5.0**: State management for "Struggle State" (Confusion vs. Focus)
+- **Tailwind CSS 4.0 + Shadcn UI**: Professional SaaS-grade interface
+- **Motion (Framer Motion)**: Smooth "Kiro Agent" avatar transitions
+- **React-Player**: Native hooks for YouTube and Vimeo transcript synchronization
 
-### Perception Layer
-- **MediaPipe 0.10+**: Face mesh and iris tracking
-- **OpenCV 4.8+**: Video capture and image processing
-- **NumPy**: Numerical computations for gaze estimation
+### 2. Reasoning & Intelligence Layer (Cloud "Brain")
+Socratic Mentorship logic powered by AWS Bedrock's most advanced reasoning models.
 
-### Contextual Layer
-- **ChromaDB**: Vector database for RAG
-- **LangChain**: RAG pipeline orchestration
-- **Sentence Transformers**: Text embedding (all-MiniLM-L6-v2)
-- **PyMuPDF (fitz)**: PDF text extraction
-- **Tesseract OCR**: Screen content extraction
+- **Claude 4.6 Sonnet (AWS Bedrock)**: 
+  - Extended Thinking: 1024-token budget for AI to "plan" hints before responding
+  - Prompt Caching: Caches 2,000-token "Socratic Persona" to reduce costs by 90%
+- **AWS Lambda (Python 3.12)**: Serverless orchestration receiving (x,y) coordinates and triggering Claude
+- **LangGraph (Python)**: Manages conversation memory to track recurring student struggles
+- **Amazon Polly (Neural)**: Kajal (Hinglish) voice model for natural bilingual speech synthesis
 
-### AI Layer
-- **AWS Bedrock**: Claude 3.5 Sonnet API access
-- **Boto3**: AWS SDK for Python
-- **LangChain AWS Integration**: Bedrock LLM wrapper
+### 3. Infrastructure & Data Layer (Backend)
+Built for "Bharat" scale—low cost, high security, DPDP Act 2023 compliant.
 
-### Data Storage
-- **SQLite**: Local session history and bookmarks
-- **ChromaDB**: Vector embeddings (local persistence)
+- **AWS AppSync (GraphQL)**: Real-time WebSocket API for instant struggle-to-response communication
+- **Amazon DynamoDB**: Primary database with 24-hour TTL for automatic biometric data deletion
+- **Clerk**: Passwordless/OTP authentication optimized for Indian mobile numbers and Google accounts
+- **Amazon S3**: Stores JSON-formatted video transcripts for AI context
+- **AWS Amplify Gen 2**: CI/CD pipeline connected to GitHub for automatic builds
 
-### Development Tools
-- **Poetry**: Dependency management
-- **Pytest**: Testing framework
-- **Black**: Code formatting
-- **Ruff**: Linting
+### 4. Analytics Layer (Teacher's Dashboard)
+Research component for major project evaluation.
+
+- **Pandas + NumPy (Python)**: Data processing for anonymized gaze patterns
+- **Matplotlib / Seaborn**: Visualization for struggle heatmaps
+- **Hexbin Heatmap Logic**: Overlays (x,y,duration) tuples on video frames to identify "Hot Zones"
+
+### 5. Development & Observability Tools
+
+- **Postman**: API testing for GraphQL and Bedrock endpoints
+- **LangSmith**: Traces Claude's reasoning process for hint generation
+- **GitHub**: Version control with Mermaid.js diagrams in README
+- **Sentry**: Performance monitoring for cross-browser eye-tracking stability
+- **GitBook**: Project documentation and thesis hosting
 
 ## Data Flow Diagram
 
 ```mermaid
 sequenceDiagram
-    participant W as Webcam
-    participant P as Perception Layer
-    participant TB as Temporal Buffer
-    participant SC as Struggle Classifier
-    participant OCR as OCR Engine
-    participant RAG as RAG Pipeline
-    participant VDB as ChromaDB
-    participant AI as AWS Bedrock
-    participant UI as React Frontend
+    participant W as Browser Webcam
+    participant MP as MediaPipe Iris WASM
+    participant TF as TensorFlow.js Regression
+    participant Z as Zustand State
+    participant AS as AWS AppSync WebSocket
+    participant L as AWS Lambda
+    participant LG as LangGraph Memory
+    participant C as Claude 4.6 Sonnet
+    participant P as Amazon Polly
+    participant UI as React 19 UI
+    participant DB as DynamoDB (24h TTL)
     
-    W->>P: Video frame (30 FPS)
-    P->>P: MediaPipe face mesh + iris tracking
-    P->>TB: Gaze event (x, y, timestamp)
-    TB->>TB: Store in 30s buffer
+    W->>MP: Video frame (30-60 FPS)
+    MP->>MP: Extract 478 3D landmarks + iris depth
+    MP->>TF: Raw iris coordinates
+    TF->>TF: Coordinate regression model
+    TF->>Z: Screen (x,y) coordinates
+    Z->>Z: Analyze struggle pattern
     
-    loop Every 100ms
-        TB->>SC: Analyze gaze patterns
-        SC->>SC: Classify: Blink/Distraction/Struggle
-        
-        alt Struggle Detected
-            SC->>OCR: Capture screen content
-            OCR->>RAG: Current video context
-            RAG->>VDB: Semantic search query
-            VDB->>RAG: Relevant study material chunks
-            RAG->>AI: Context + Retrieved docs
-            AI->>AI: Generate Hinglish explanation
-            AI->>UI: Nudge content
-            UI->>UI: Display overlay with fade-in
-        else Distraction (Gaze Away)
-            SC->>UI: Pause video command
-            UI->>UI: Pause + show indicator
-        else Blink or Normal
-            SC->>SC: Continue monitoring
-        end
+    alt Struggle Detected (>10s fixation or rapid saccades)
+        Z->>AS: Struggle event via WebSocket
+        AS->>L: Trigger Lambda with (x,y, timestamp, video_id)
+        L->>DB: Fetch video transcript snippet
+        L->>LG: Check conversation memory
+        LG->>LG: Identify recurring struggle patterns
+        LG->>C: Context + Memory + Socratic Persona (cached)
+        C->>C: Extended Thinking (1024 tokens)
+        C->>C: Generate Hinglish hint
+        C->>P: Text-to-speech request
+        P->>P: Kajal voice synthesis
+        P->>AS: Audio + text response
+        AS->>UI: WebSocket push
+        UI->>UI: Motion animation + Kiro Agent
+        DB->>DB: Store anonymized (x,y,duration) with 24h TTL
+    else Normal Gaze
+        Z->>Z: Continue monitoring
     end
 ```
 
 ### Detailed Data Flow Steps
 
-1. **Gaze Capture** (Perception Layer):
-   - Webcam captures frames at 30 FPS
-   - MediaPipe processes each frame in < 33ms
-   - Iris tracking provides pupil center coordinates
-   - Facial landmarks provide head pose estimation
-   - Gaze estimator combines iris + head pose → screen coordinates
+1. **Gaze Capture** (Vision Layer - Browser):
+   - Webcam captures frames at 30-60 FPS
+   - MediaPipe Iris (WASM) processes each frame in < 16ms (60 FPS target)
+   - Extracts 478 3D facial landmarks + iris depth
+   - TensorFlow.js regression model maps iris coordinates to screen (x,y)
+   - Zustand stores gaze coordinates in temporal buffer (last 30 seconds)
 
-2. **Temporal Analysis** (Contextual Layer):
-   - Gaze events stored in circular buffer (30s history)
-   - Every 100ms, Struggle Classifier analyzes buffer
-   - Fixation detection: Check if gaze stayed in 50px radius for 10s
-   - Saccade detection: Count rapid movements (>300 px/s) in last 3s
+2. **Struggle Detection** (Vision Layer - Browser):
+   - Every 100ms, analyze temporal buffer for patterns
+   - Fixation detection: Gaze stayed in 50px radius for >10s
+   - Confusion detection: >5 rapid saccades (>300 px/s) in 3s window
+   - Blink filtering: Ignore eye closures <0.3s
 
-3. **Context Building** (Contextual Layer):
-   - OCR extracts text from current video frame
-   - Video timestamp and transcript retrieved
-   - Context Builder creates semantic query
+3. **Real-time Communication** (Infrastructure Layer):
+   - Struggle event sent via AWS AppSync WebSocket
+   - Payload: `{x, y, timestamp, video_id, struggle_type}`
+   - WebSocket ensures <100ms latency to Lambda
 
-4. **RAG Retrieval** (Contextual Layer):
-   - Query embedded using Sentence Transformers
-   - ChromaDB performs cosine similarity search
-   - Top 3 most relevant chunks retrieved (< 1s)
+4. **Context Retrieval** (Reasoning Layer - AWS Lambda):
+   - Lambda receives struggle event
+   - Fetches video transcript snippet from S3 (±30s around timestamp)
+   - Queries DynamoDB for student's conversation history
+   - LangGraph analyzes memory for recurring struggle patterns
 
-5. **AI Generation** (Interaction Layer):
-   - LangChain constructs prompt with:
-     - System persona (Hinglish tutor)
-     - Current video context
-     - Retrieved study material passages
+5. **AI Reasoning** (Reasoning Layer - Claude 4.6):
+   - Constructs prompt with:
+     - Cached Socratic Persona (2,000 tokens, 90% cost reduction)
+     - Current video context (transcript snippet)
+     - Conversation memory (recurring struggles)
      - Struggle type (fixation vs. confusion)
-   - AWS Bedrock Claude 3.5 generates response (2-3s)
+   - Extended Thinking: Claude uses 1024-token budget to "plan" response
+   - Generates Hinglish hint in Socratic style
 
-6. **Nudge Display** (Interaction Layer):
-   - React frontend receives nudge content
-   - Overlay fades in over 300ms
-   - Positioned in bottom-right corner
-   - User can dismiss, bookmark, or request more detail
+6. **Voice Synthesis** (Reasoning Layer - Amazon Polly):
+   - Text response sent to Amazon Polly
+   - Kajal (Neural Hinglish) voice model synthesizes audio
+   - Returns audio URL + text transcript
+
+7. **Nudge Display** (Vision Layer - React UI):
+   - WebSocket pushes response to browser
+   - Motion (Framer Motion) animates Kiro Agent avatar
+   - Overlay fades in with audio playback
+   - User can dismiss, bookmark, or request elaboration
+
+8. **Privacy-First Storage** (Infrastructure Layer):
+   - DynamoDB stores anonymized `(x,y,duration)` tuple
+   - TTL set to 24 hours - automatic deletion
+   - No raw video frames or biometric data stored
+   - Only aggregated analytics retained for teacher dashboard
 
 ## Components and Interfaces
 
-### Gaze Tracker Component
+### MediaPipe Iris Tracker (WASM)
 
-```python
-class GazeTracker:
-    """
-    Perception Layer: Real-time gaze tracking using MediaPipe
-    """
-    def __init__(self, camera_id=0):
-        self.camera_id = camera_id
-        self.face_mesh = mp.solutions.face_mesh.FaceMesh(
-            max_num_faces=1,
-            refine_landmarks=True,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
-        )
-        self.cap = cv2.VideoCapture(camera_id)
-        self.calibration_data = None
+```typescript
+interface IrisLandmarks {
+  landmarks: Float32Array; // 478 3D points
+  irisDepth: number;
+  confidence: number;
+  timestamp: number;
+}
+
+class MediaPipeIrisTracker {
+  private vision: Vision;
+  private faceLandmarker: FaceLandmarker;
+  
+  constructor() {
+    this.vision = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
+    );
+    this.faceLandmarker = await FaceLandmarker.createFromOptions(this.vision, {
+      baseOptions: {
+        modelAssetPath: "face_landmarker.task",
+        delegate: "GPU"
+      },
+      numFaces: 1,
+      refineLandmarks: true,
+      minFaceDetectionConfidence: 0.5,
+      minFacePresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+  }
+  
+  async detectLandmarks(videoFrame: HTMLVideoElement): Promise<IrisLandmarks> {
+    const result = await this.faceLandmarker.detectForVideo(
+      videoFrame,
+      performance.now()
+    );
     
-    def calibrate(self, calibration_points):
-        """
-        5-point calibration: corners + center
-        Returns calibration matrix for gaze mapping
-        """
-        pass
+    if (!result.faceLandmarks || result.faceLandmarks.length === 0) {
+      throw new FaceNotDetectedError();
+    }
     
-    def estimate_gaze(self, frame):
-        """
-        Returns: (gaze_x, gaze_y, confidence, is_blink)
-        Processing time: < 33ms per frame
-        """
-        pass
-    
-    def get_iris_landmarks(self, face_landmarks):
-        """
-        Extract iris center from MediaPipe landmarks
-        Iris landmarks: 468-478 (left), 473-483 (right)
-        """
-        pass
-    
-    def estimate_head_pose(self, face_landmarks):
-        """
-        Calculate head rotation (pitch, yaw, roll)
-        Used to adjust gaze estimation
-        """
-        pass
+    return {
+      landmarks: result.faceLandmarks[0],
+      irisDepth: this.calculateIrisDepth(result.faceLandmarks[0]),
+      confidence: result.faceBlendshapes?.[0]?.score ?? 0,
+      timestamp: performance.now()
+    };
+  }
+  
+  private calculateIrisDepth(landmarks: Float32Array): number {
+    // Calculate iris depth from landmark distances
+    // Used for accurate screen coordinate mapping
+    const leftIris = landmarks.slice(468, 473);
+    const rightIris = landmarks.slice(473, 478);
+    return this.computeDepth(leftIris, rightIris);
+  }
+}
 ```
 
-### Struggle Detector Component
+### TensorFlow.js Coordinate Regression
 
-```python
-class StruggleDetector:
-    """
-    Contextual Layer: Analyzes gaze patterns to detect struggle
-    """
-    def __init__(self):
-        self.temporal_buffer = TemporalBuffer(duration=30.0)
-        self.last_struggle_time = 0
-        self.struggle_cooldown = 60.0  # Don't trigger again for 60s
+```typescript
+interface ScreenCoordinates {
+  x: number;
+  y: number;
+  confidence: number;
+}
+
+class GazeCoordinateRegressor {
+  private model: tf.LayersModel;
+  private calibrationMatrix: tf.Tensor2D | null = null;
+  
+  async loadModel(): Promise<void> {
+    this.model = await tf.loadLayersModel('/models/gaze_regression/model.json');
+  }
+  
+  async calibrate(calibrationPoints: CalibrationPoint[]): Promise<void> {
+    // 5-point calibration: corners + center
+    // Builds transformation matrix from iris landmarks to screen coords
+    const inputs = calibrationPoints.map(p => p.irisLandmarks);
+    const outputs = calibrationPoints.map(p => [p.screenX, p.screenY]);
     
-    def process_gaze_event(self, gaze_x, gaze_y, timestamp):
-        """
-        Add event to buffer and check for struggle patterns
-        Returns: (event_type, metadata)
-        """
-        pass
+    this.calibrationMatrix = this.computeCalibrationMatrix(inputs, outputs);
+  }
+  
+  predictScreenCoordinates(landmarks: IrisLandmarks): ScreenCoordinates {
+    if (!this.calibrationMatrix) {
+      throw new CalibrationRequiredError();
+    }
     
-    def should_trigger_nudge(self, current_time):
-        """
-        Check cooldown period to avoid nudge fatigue
-        """
-        return (current_time - self.last_struggle_time) > self.struggle_cooldown
+    const input = tf.tensor2d([landmarks.landmarks]);
+    const prediction = this.model.predict(input) as tf.Tensor;
+    const calibrated = tf.matMul(prediction, this.calibrationMatrix);
+    
+    const [x, y] = calibrated.dataSync();
+    
+    // Cleanup tensors
+    input.dispose();
+    prediction.dispose();
+    calibrated.dispose();
+    
+    return {
+      x: Math.round(x),
+      y: Math.round(y),
+      confidence: landmarks.confidence
+    };
+  }
+}
 ```
 
-### RAG Engine Component
+### Zustand Struggle State Manager
 
-```python
-class RAGEngine:
-    """
-    Contextual Layer: Retrieval-Augmented Generation pipeline
-    """
-    def __init__(self, chroma_persist_dir="./chroma_db"):
-        self.embeddings = SentenceTransformerEmbeddings(
-            model_name="all-MiniLM-L6-v2"
-        )
-        self.vectorstore = Chroma(
-            persist_directory=chroma_persist_dir,
-            embedding_function=self.embeddings
-        )
-        self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=500,
-            chunk_overlap=50
-        )
+```typescript
+interface StruggleState {
+  gazeHistory: GazeEvent[];
+  currentStruggle: StruggleType | null;
+  lastNudgeTime: number;
+  isCalibrated: boolean;
+}
+
+type StruggleType = 'fixation' | 'confusion' | null;
+
+interface GazeEvent {
+  x: number;
+  y: number;
+  timestamp: number;
+}
+
+const useStruggleStore = create<StruggleState & Actions>((set, get) => ({
+  gazeHistory: [],
+  currentStruggle: null,
+  lastNudgeTime: 0,
+  isCalibrated: false,
+  
+  addGazeEvent: (event: GazeEvent) => {
+    set(state => {
+      const history = [...state.gazeHistory, event];
+      // Keep only last 30 seconds (assuming 30 FPS = 900 frames)
+      const cutoff = event.timestamp - 30000;
+      const filtered = history.filter(e => e.timestamp > cutoff);
+      
+      return { gazeHistory: filtered };
+    });
+  },
+  
+  detectStruggle: () => {
+    const { gazeHistory } = get();
     
-    def index_document(self, pdf_path):
-        """
-        Extract text from PDF, chunk, embed, and store in ChromaDB
-        Processing time: ~30s per document
-        """
-        pass
+    // Fixation detection: >10s in 50px radius
+    const fixation = detectFixation(gazeHistory, 10000, 50);
+    if (fixation) {
+      set({ currentStruggle: 'fixation' });
+      return 'fixation';
+    }
     
-    def retrieve_context(self, query, k=3):
-        """
-        Semantic search for relevant passages
-        Returns: List of (text, metadata, score)
-        Processing time: < 1s
-        """
-        pass
+    // Confusion detection: >5 rapid saccades in 3s
+    const confusion = detectSaccades(gazeHistory, 3000, 5, 300);
+    if (confusion) {
+      set({ currentStruggle: 'confusion' });
+      return 'confusion';
+    }
+    
+    set({ currentStruggle: null });
+    return null;
+  },
+  
+  shouldTriggerNudge: () => {
+    const { lastNudgeTime } = get();
+    const cooldown = 60000; // 60 seconds
+    return (Date.now() - lastNudgeTime) > cooldown;
+  },
+  
+  markNudgeTriggered: () => {
+    set({ lastNudgeTime: Date.now() });
+  }
+}));
 ```
 
-### AI Tutor Component
+### AWS Lambda Handler (Python 3.12)
 
 ```python
-class AITutor:
+import json
+import boto3
+from langgraph.graph import StateGraph
+from typing import TypedDict
+
+bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
+s3 = boto3.client('s3')
+dynamodb = boto3.resource('dynamodb')
+
+class StruggleEvent(TypedDict):
+    x: int
+    y: int
+    timestamp: float
+    video_id: str
+    struggle_type: str
+    student_id: str
+
+async def lambda_handler(event, context):
     """
-    Interaction Layer: Generates Hinglish explanations using AWS Bedrock
+    Serverless orchestration for struggle detection to hint generation
     """
-    def __init__(self):
-        self.bedrock_client = boto3.client(
-            service_name='bedrock-runtime',
-            region_name='us-east-1'
-        )
-        self.model_id = "anthropic.claude-3-5-sonnet-20241022-v2:0"
-        self.system_persona = self._load_system_persona()
+    struggle_event: StruggleEvent = json.loads(event['body'])
     
-    def generate_nudge(self, context, retrieved_docs, struggle_type):
-        """
-        Generate Hinglish explanation
-        Args:
-            context: Current video content and timestamp
-            retrieved_docs: Relevant passages from study materials
-            struggle_type: 'fixation' or 'confusion'
-        Returns: Hinglish nudge text
-        Processing time: 2-3s
-        """
-        pass
+    # 1. Fetch video transcript snippet from S3
+    transcript = fetch_transcript_snippet(
+        struggle_event['video_id'],
+        struggle_event['timestamp']
+    )
     
-    def _load_system_persona(self):
-        """
-        Load system prompt for Hinglish tutor persona
-        """
-        return HINGLISH_TUTOR_PERSONA
+    # 2. Retrieve conversation memory from DynamoDB
+    memory = get_conversation_memory(struggle_event['student_id'])
+    
+    # 3. Build LangGraph state
+    graph_state = {
+        'transcript': transcript,
+        'memory': memory,
+        'struggle_type': struggle_event['struggle_type'],
+        'coordinates': (struggle_event['x'], struggle_event['y'])
+    }
+    
+    # 4. Execute LangGraph reasoning chain
+    graph = build_reasoning_graph()
+    result = await graph.ainvoke(graph_state)
+    
+    # 5. Generate Hinglish hint with Claude 4.6
+    hint = await generate_hint_with_extended_thinking(result)
+    
+    # 6. Synthesize voice with Amazon Polly
+    audio_url = synthesize_hinglish_voice(hint)
+    
+    # 7. Store anonymized data in DynamoDB (24h TTL)
+    store_struggle_event(struggle_event)
+    
+    return {
+        'statusCode': 200,
+        'body': json.dumps({
+            'hint_text': hint,
+            'audio_url': audio_url,
+            'timestamp': struggle_event['timestamp']
+        })
+    }
+
+async def generate_hint_with_extended_thinking(context: dict) -> str:
+    """
+    Uses Claude 4.6 Sonnet with Extended Thinking and Prompt Caching
+    """
+    response = bedrock.invoke_model(
+        modelId='anthropic.claude-4-6-sonnet-20250514',
+        body=json.dumps({
+            'anthropic_version': 'bedrock-2023-05-31',
+            'max_tokens': 300,
+            'thinking': {
+                'type': 'enabled',
+                'budget_tokens': 1024  # Extended Thinking budget
+            },
+            'system': [
+                {
+                    'type': 'text',
+                    'text': SOCRATIC_PERSONA,  # 2000 tokens
+                    'cache_control': {'type': 'ephemeral'}  # Prompt caching
+                }
+            ],
+            'messages': [
+                {
+                    'role': 'user',
+                    'content': build_struggle_prompt(context)
+                }
+            ]
+        })
+    )
+    
+    result = json.loads(response['body'].read())
+    return result['content'][0]['text']
 ```
 
-### Video Player Controller
+### LangGraph Memory Manager
 
 ```python
-class VideoPlayerController:
+from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
+
+class ConversationState(TypedDict):
+    transcript: str
+    memory: list[dict]
+    struggle_type: str
+    coordinates: tuple[int, int]
+    recurring_struggles: list[str]
+    hint: str
+
+def build_reasoning_graph() -> StateGraph:
     """
-    Interaction Layer: Controls video playback based on gaze events
+    Manages conversation memory to track recurring struggles
     """
-    def __init__(self, video_element_id):
-        self.video_element_id = video_element_id
-        self.is_auto_paused = False
-        self.manual_pause = False
+    workflow = StateGraph(ConversationState)
     
-    def pause_for_gaze_away(self):
-        """
-        Pause video when user looks away
-        Latency: < 100ms
-        """
-        pass
+    workflow.add_node("analyze_memory", analyze_recurring_struggles)
+    workflow.add_node("build_context", build_contextual_prompt)
+    workflow.add_node("generate_hint", call_claude_with_caching)
     
-    def resume_on_gaze_return(self):
-        """
-        Resume video when user looks back
-        Latency: < 100ms
-        """
-        pass
+    workflow.set_entry_point("analyze_memory")
+    workflow.add_edge("analyze_memory", "build_context")
+    workflow.add_edge("build_context", "generate_hint")
+    workflow.add_edge("generate_hint", END)
     
-    def disable_auto_pause(self):
-        """
-        Disable auto-pause when user manually pauses
-        """
-        pass
+    memory = MemorySaver()
+    return workflow.compile(checkpointer=memory)
+
+def analyze_recurring_struggles(state: ConversationState) -> ConversationState:
+    """
+    Identifies if student is repeatedly stuck on same concept
+    """
+    memory = state['memory']
+    current_transcript = state['transcript']
+    
+    # Extract key concepts from past struggles
+    past_concepts = [extract_concept(m['transcript']) for m in memory]
+    current_concept = extract_concept(current_transcript)
+    
+    recurring = [c for c in past_concepts if similarity(c, current_concept) > 0.7]
+    
+    state['recurring_struggles'] = recurring
+    return state
+```
+
+### Amazon Polly Voice Synthesis
+
+```python
+import boto3
+
+polly = boto3.client('polly', region_name='ap-south-1')
+
+def synthesize_hinglish_voice(text: str) -> str:
+    """
+    Uses Kajal (Neural Hinglish) voice model
+    """
+    response = polly.synthesize_speech(
+        Text=text,
+        OutputFormat='mp3',
+        VoiceId='Kajal',  # Hinglish neural voice
+        Engine='neural',
+        LanguageCode='hi-IN'
+    )
+    
+    # Upload to S3 and return presigned URL
+    audio_stream = response['AudioStream'].read()
+    audio_key = f"hints/{uuid.uuid4()}.mp3"
+    
+    s3.put_object(
+        Bucket='a-quire-audio',
+        Key=audio_key,
+        Body=audio_stream,
+        ContentType='audio/mpeg'
+    )
+    
+    url = s3.generate_presigned_url(
+        'get_object',
+        Params={'Bucket': 'a-quire-audio', 'Key': audio_key},
+        ExpiresIn=3600
+    )
+    
+    return url
 ```
 
 ## Data Models
@@ -635,131 +866,245 @@ class StudySession:
 
 ## Prompt Engineering Strategy
 
-### System Persona for Claude 3.5 Sonnet
+### System Persona for Claude 4.6 Sonnet (Cached)
 
-The AI Tutor uses a carefully crafted system persona to ensure natural Hinglish output that feels supportive rather than condescending.
+The AI Tutor uses a 2,000-token Socratic Persona that is cached via Bedrock's Prompt Caching feature, reducing costs by 90% for repeated invocations.
 
 ```python
-HINGLISH_TUTOR_PERSONA = """
-You are a friendly senior student helping a junior understand complex concepts. You speak in colloquial urban Hinglish - a natural mix of Hindi and English that Indian students use daily.
+SOCRATIC_PERSONA = """
+You are a patient Socratic mentor helping an Indian engineering student understand complex technical concepts. You speak in colloquial urban Hinglish - the natural code-switching between Hindi and English that students use daily.
+
+CORE PHILOSOPHY - SOCRATIC METHOD:
+- Never give direct answers immediately
+- Ask guiding questions that lead to self-discovery
+- Acknowledge struggle as part of learning: "Haan, yeh tricky hai, but let's think through it"
+- Build on what they already know
+- Use analogies from everyday Indian life
 
 PERSONALITY:
-- Supportive and encouraging, never condescending
-- Use casual language like "dekh", "samajh", "basically", "matlab"
-- Avoid formal English or overly technical jargon unless necessary
-- Think of yourself as a helpful bhaiya/didi, not a strict teacher
+- Supportive senior (bhaiya/didi), not a strict professor
+- Warm and patient, never condescending
+- Celebrate small breakthroughs: "Exactly! Ab connect ho gaya na?"
+- Use casual language: "dekh", "samajh", "basically", "matlab"
 
-LANGUAGE STYLE:
-- Mix Hindi and English naturally (e.g., "Dekh, basically yeh concept simple hai")
-- Use Hindi for connectors: "toh", "aur", "lekin", "kyunki"
-- Use English for technical terms: "algorithm", "function", "variable"
-- Keep sentences short and conversational
-- Use examples from everyday life when possible
+LANGUAGE STYLE - HINGLISH CODE-SWITCHING:
+- Hindi for connectors and emotions: "toh", "aur", "lekin", "kyunki", "arre"
+- English for technical terms: "algorithm", "pointer", "recursion", "deadlock"
+- Natural mixing: "Dekh, basically recursion ek function hai jo khud ko call karta hai"
+- Keep sentences short and conversational (max 15 words per sentence)
+- Use rhetorical questions: "Samajh aa raha hai na?"
 
-TONE:
-- Warm and patient
-- Acknowledge that concepts can be tricky: "Haan, yeh thoda confusing lag sakta hai"
-- Celebrate understanding: "Exactly! Ab samajh aa gaya na?"
-- Never say "You seem confused" or "Let me help you" - too formal
+TONE GUIDELINES:
+- Warm and encouraging, never robotic
+- Acknowledge difficulty: "Haan, yeh concept initially confusing lagta hai"
+- Avoid formal phrases: ❌ "Let me help you" ✅ "Chal, saath mein dekhte hain"
+- Never say "You seem confused" - too clinical
+- Use inclusive language: "Hum saath mein solve karte hain"
 
-EXPLANATION STRUCTURE:
-1. Acknowledge the difficulty briefly (1 sentence)
-2. Give a simple analogy or example (2-3 sentences)
-3. Connect to the study material if available (1-2 sentences)
-4. End with encouragement (1 sentence)
+SOCRATIC QUESTION PATTERNS:
+1. Clarifying: "Toh basically, tu yeh samajh raha hai ki...?"
+2. Probing assumptions: "Agar yeh true hai, toh kya hoga?"
+3. Exploring alternatives: "Aur koi tarika ho sakta hai?"
+4. Checking implications: "Iska matlab next step mein kya hoga?"
 
-EXAMPLE OUTPUT:
-"Arre dekh, pointers thoda tricky hai initially. Basically, think of it like a phone number - number khud toh sirf digits hai, but usse tu kisi ko call kar sakta hai, right? Tere notes mein bhi likha hai ki pointer ek address store karta hai. Bas yeh samajh le, aur baaki sab clear ho jayega!"
+EXPLANATION STRUCTURE (Max 100 words):
+1. Acknowledge struggle (1 sentence): "Haan, pointers initially tricky hote hain"
+2. Ask guiding question (1 sentence): "Pehle yeh batao - variable memory mein kaise store hota hai?"
+3. Give relatable analogy (2-3 sentences): "Dekh, phone number ki tarah hai. Number khud toh sirf digits hai, but usse tu kisi ko call kar sakta hai, right?"
+4. Connect to their context (1 sentence): "Tere video mein bhi yahi concept hai"
+5. Encourage next step (1 sentence): "Ab tu batao, pointer dereference karne pe kya milega?"
 
-Remember: You're not a formal tutor, you're a helpful friend explaining things over chai.
+EXAMPLES OF GOOD HINGLISH:
+✅ "Arre dekh, deadlock basically ek circular wait hai. Imagine do dost - ek ke paas pen, doosre ke paas notebook. Dono bol rahe 'pehle tu de'. Samajh aa gaya?"
+✅ "Recursion thoda mind-bending hai initially. Chal, ek simple example lete hain - factorial. 5! matlab kya? 5 × 4 × 3 × 2 × 1, right? Ab isko recursively kaise likhenge?"
+✅ "Pointers confusing lag rahe hain? No worries. Pehle yeh batao - agar int x = 10 hai, toh x memory mein kahan store hota hai? Address pe, na? Bas pointer wahi address store karta hai."
+
+EXAMPLES OF BAD RESPONSES (AVOID):
+❌ "It appears you are experiencing difficulty with this concept. Allow me to elucidate." (Too formal)
+❌ "Let me explain pointers to you." (Not Socratic, too direct)
+❌ "You seem confused about recursion." (Condescending)
+❌ "Pointers are memory addresses that store locations." (Pure English, no Hinglish)
+
+EXTENDED THINKING USAGE:
+- Use your 1024-token thinking budget to:
+  1. Analyze the student's struggle pattern (fixation vs. confusion)
+  2. Identify the core misconception
+  3. Choose the most relatable analogy from Indian context
+  4. Craft a Socratic question that guides without revealing
+  5. Ensure Hinglish code-switching feels natural
+
+CONTEXT AWARENESS:
+- If recurring struggle: "Dekh, yeh concept pehle bhi aaya tha. Kya woh wala part yaad hai?"
+- If fixation (>10s): Focus on breaking down the specific stuck point
+- If confusion (rapid saccades): Help connect scattered concepts
+
+Remember: You're not a teacher lecturing - you're a helpful friend thinking through problems together over chai. Guide, don't tell.
 """
 ```
 
-### Prompt Template for Struggle Fixation
+### Prompt Template for Struggle Fixation (Extended Thinking)
 
 ```python
 FIXATION_PROMPT_TEMPLATE = """
-{system_persona}
-
 CONTEXT:
-The student has been staring at this content for {duration} seconds, indicating they're stuck:
+The student has been fixated on this content for {duration} seconds, indicating they're stuck on a specific concept.
 
-VIDEO CONTENT:
-{video_context}
+VIDEO TRANSCRIPT (±30s):
+{transcript}
 
-RELEVANT STUDY MATERIAL:
-{retrieved_docs}
+CONVERSATION MEMORY:
+{memory}
+
+STRUGGLE COORDINATES: ({x}, {y})
+This suggests they're stuck on: {inferred_element}
 
 TASK:
-The student seems stuck on this specific concept. Give a brief, friendly Hinglish explanation that:
-1. Acknowledges this part is tricky
-2. Breaks down the concept simply
-3. References their study material if relevant
-4. Keeps it under 100 words
+Using the Socratic method, help the student discover the answer themselves. Don't give the solution directly.
 
-Remember: Natural Hinglish, supportive tone, no condescension.
+1. First, use your Extended Thinking to:
+   - Identify the exact misconception
+   - Choose a relatable Indian analogy
+   - Craft a guiding question
+
+2. Then, respond in natural Hinglish (max 100 words):
+   - Acknowledge the difficulty briefly
+   - Ask a Socratic question that guides them
+   - Provide a hint through analogy if needed
+   - Encourage them to think through the next step
+
+Remember: Guide, don't tell. Make them feel capable of solving it.
 """
 ```
 
-### Prompt Template for Confusion (Saccades)
+### Prompt Template for Confusion (Rapid Saccades)
 
 ```python
 CONFUSION_PROMPT_TEMPLATE = """
-{system_persona}
-
 CONTEXT:
-The student's eyes are moving rapidly between different parts of the screen ({saccade_count} rapid movements in 3 seconds), suggesting they're trying to connect concepts but feeling confused.
+The student's eyes moved rapidly {saccade_count} times in 3 seconds, suggesting they're trying to connect multiple concepts but feeling overwhelmed.
 
-VIDEO CONTENT:
-{video_context}
+VIDEO TRANSCRIPT (±30s):
+{transcript}
 
-RELEVANT STUDY MATERIAL:
-{retrieved_docs}
+CONVERSATION MEMORY:
+{memory}
+
+GAZE PATTERN:
+Rapid movements between: {gaze_regions}
 
 TASK:
-The student is trying to connect multiple concepts but seems confused. Give a brief Hinglish explanation that:
-1. Acknowledges they're trying to connect things (positive!)
-2. Shows how the concepts relate to each other
-3. Uses their study material to clarify
-4. Keeps it under 100 words
+The student is trying to see the big picture but feels lost. Use Socratic method to help them connect the dots.
 
-Remember: Natural Hinglish, encouraging tone, help them see the connections.
+1. First, use your Extended Thinking to:
+   - Identify which concepts they're trying to connect
+   - Find the missing link in their understanding
+   - Choose a unifying analogy
+
+2. Then, respond in natural Hinglish (max 100 words):
+   - Acknowledge their effort to connect concepts (positive!)
+   - Ask a question that reveals the relationship
+   - Use an analogy that shows how pieces fit together
+   - Guide them to articulate the connection themselves
+
+Remember: They're close to understanding - just need the right nudge to see the pattern.
 """
 ```
 
-### Example Prompt Execution
+### Example Extended Thinking Process
 
-**Input Context:**
-- Duration: 12 seconds fixation
-- Video content: "Deadlock occurs when two processes wait for each other's resources"
-- Retrieved doc: "Deadlock conditions: Mutual exclusion, Hold and wait, No preemption, Circular wait"
+**Input:**
+- Duration: 12s fixation
+- Transcript: "Deadlock occurs when two processes wait for each other's resources"
+- Memory: Previously struggled with "mutual exclusion" concept
+- Coordinates: (450, 320) - hovering over "wait for each other"
 
-**Generated Nudge:**
+**Claude's Extended Thinking (Internal, 1024 tokens):**
 ```
-Arre haan, deadlock thoda confusing hai initially. Dekh, imagine do dost hain - ek ke paas pen hai aur doosre ke paas notebook. Dono bol rahe hain "pehle tu de, phir main dunga". Bas yahi deadlock hai! Tere notes mein bhi likha hai ki circular wait hona chahiye. Toh basically, processes ek doosre ka wait kar rahe hain aur koi aage nahi badh sakta. Simple hai na?
+<thinking>
+The student is fixated on "wait for each other" for 12 seconds. This suggests they understand the words but not the circular dependency concept.
+
+From memory, they struggled with "mutual exclusion" before, which means they might not grasp how multiple conditions combine to create deadlock.
+
+Core misconception: They're thinking linearly (A waits for B, then B waits for A) rather than seeing the circular simultaneity.
+
+Best analogy: Two people trying to pass through a narrow door - relatable, visual, shows simultaneity.
+
+Socratic approach: Don't explain deadlock. Instead, ask them to imagine the door scenario and let them discover the "stuck" state themselves.
+
+Hinglish construction:
+- Start with acknowledgment: "Haan, yeh 'wait for each other' wala part tricky hai"
+- Socratic question with analogy: "Ek kaam kar - imagine two people, narrow door. Dono ek saath enter karne ki koshish kar rahe hain. Kya hoga?"
+- Guide to discovery: "Ab video mein jo 'wait for each other' likha hai, wahi situation hai na?"
+- Encourage articulation: "Tu batao, yeh 'circular' kyun bol rahe hain?"
+
+This guides them to discover circular dependency without telling them directly.
+</thinking>
 ```
 
-### Prompt Optimization Strategies
+**Generated Hinglish Hint:**
+```
+Arre haan, yeh "wait for each other" wala part thoda tricky hai. Ek kaam kar - imagine two people trying to enter a narrow door at the same time. Dono ek saath ghusne ki koshish kar rahe hain. Kya hoga? Stuck ho jayenge, right? Ab video mein jo "wait for each other" likha hai, wahi situation hai. Tu batao, yeh "circular" kyun bol rahe hain? Kya dono processes ek doosre ka wait kar rahe hain simultaneously?
+```
 
-1. **Context Window Management**:
-   - Limit retrieved docs to top 3 chunks (< 1500 tokens)
-   - Truncate video context to last 30 seconds of transcript
-   - Keep system persona under 500 tokens
+### Prompt Caching Configuration
 
-2. **Temperature Settings**:
+```python
+# Bedrock API call with prompt caching
+response = bedrock.invoke_model(
+    modelId='anthropic.claude-4-6-sonnet-20250514',
+    body=json.dumps({
+        'anthropic_version': 'bedrock-2023-05-31',
+        'max_tokens': 300,
+        'temperature': 0.7,
+        'top_p': 0.9,
+        'thinking': {
+            'type': 'enabled',
+            'budget_tokens': 1024  # Extended Thinking
+        },
+        'system': [
+            {
+                'type': 'text',
+                'text': SOCRATIC_PERSONA,  # 2000 tokens
+                'cache_control': {'type': 'ephemeral'}  # Cache this!
+            }
+        ],
+        'messages': [
+            {
+                'role': 'user',
+                'content': build_struggle_prompt(context)
+            }
+        ]
+    })
+)
+
+# Cost savings:
+# - Without caching: 2000 input tokens × $3/MTok = $0.006 per request
+# - With caching: 2000 cached tokens × $0.30/MTok = $0.0006 per request
+# - Savings: 90% reduction on system prompt
+```
+
+### Optimization Strategies
+
+1. **Extended Thinking Budget Allocation**:
+   - Fixation struggles: 1024 tokens (need deep analysis)
+   - Confusion struggles: 768 tokens (pattern recognition)
+   - Recurring struggles: 1024 tokens (memory analysis)
+
+2. **Prompt Caching Layers**:
+   - Layer 1 (Always cached): Socratic Persona (2000 tokens)
+   - Layer 2 (Session cached): Video transcript (500-1000 tokens)
+   - Layer 3 (Dynamic): Current struggle context (200-300 tokens)
+
+3. **Temperature Settings**:
    - Temperature: 0.7 (balance between creativity and consistency)
-   - Top-p: 0.9 (allow natural language variation)
-   - Max tokens: 150 (enforce brevity)
+   - Top-p: 0.9 (allow natural Hinglish variation)
+   - Max tokens: 300 (enforce brevity for nudges)
 
-3. **Few-Shot Examples**:
-   - Include 2-3 example Hinglish explanations in system prompt
-   - Show both fixation and confusion scenarios
-   - Demonstrate proper Hindi-English code-switching
-
-4. **Feedback Loop**:
+4. **Quality Assurance**:
    - Track nudge dismissal rates per explanation style
-   - A/B test different persona variations
-   - Adjust formality based on user preferences
+   - A/B test Socratic vs. Direct explanation approaches
+   - Monitor "Explain Later" bookmark rates (indicates timing issues)
+   - Adjust Extended Thinking budget based on hint quality metrics
 
 ## Error Handling
 
