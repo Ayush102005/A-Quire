@@ -1,0 +1,52 @@
+# Render deployment blueprint — https://render.com/docs/blueprint-spec
+# Push to GitHub, then connect the repo in the Render dashboard and select this file.
+
+services:
+  - type: web
+    name: aquire-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free                     # upgrade to starter for always-on
+    healthCheckPath: /
+    envVars:
+      # ── Required: set real values in Render dashboard → Environment ──────
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: ap-south-1
+      - key: AWS_BEDROCK_REGION
+        value: us-east-1
+      - key: BEDROCK_MODEL_ID
+        value: amazon.nova-lite-v1:0
+      - key: DYNAMODB_REGION
+        value: ap-south-1
+      - key: S3_REGION
+        value: ap-south-1
+      - key: S3_BUCKET_NAME
+        sync: false
+      - key: REKOGNITION_REGION
+        value: ap-south-1
+      - key: COMPREHEND_REGION
+        value: us-east-1
+      - key: POLLY_REGION
+        value: ap-south-1
+      - key: SES_REGION
+        value: ap-south-1
+      - key: SES_FROM_EMAIL
+        value: kiro@a-quire.in
+      - key: COGNITO_USER_POOL_ID
+        sync: false
+      - key: COGNITO_CLIENT_ID
+        sync: false
+      - key: COGNITO_REGION
+        value: ap-south-1
+      # Set this to your Vercel frontend URL after deploying frontend
+      - key: ALLOWED_ORIGINS
+        value: https://a-quire.vercel.app
+      - key: APP_URL
+        value: https://a-quire.vercel.app
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "30"

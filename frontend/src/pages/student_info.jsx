@@ -1,5 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { calculateThreshold, saveProfile } from "../api";
+import { getCurrentUserInfo } from "../cognito";
 
 const YELLOW = "#FFD700";
 const ORANGE = "#FF6A00";
@@ -188,20 +190,28 @@ function NavBtns({ onBack, onNext, nextLabel = "Next →", disabled = false, sho
 }
 
 // ── LAUNCH BUTTON ──
-function LaunchBtn({ onClick }) {
+function LaunchBtn({ onClick, loading }) {
   const [hov, setHov] = useState(false);
   return (
-    <button onClick={onClick}
+    <button onClick={onClick} disabled={loading}
       onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{
         background: `linear-gradient(135deg, ${YELLOW}, ${ORANGE})`,
         color: "#0D0D0D", fontWeight: 800, border: "none",
-        cursor: "pointer", padding: "1rem 3rem", borderRadius: 10, width: "100%",
+        cursor: loading ? "not-allowed" : "pointer", padding: "1rem 3rem", borderRadius: 10, width: "100%",
         fontFamily: "'DM Sans', sans-serif", fontSize: "1.05rem", letterSpacing: "0.03em",
-        transform: hov ? "translateY(-3px)" : "none",
-        boxShadow: hov ? "0 12px 40px rgba(255,180,0,0.35)" : "0 6px 24px rgba(255,180,0,0.15)",
+        transform: (!loading && hov) ? "translateY(-3px)" : "none",
+        boxShadow: (!loading && hov) ? "0 12px 40px rgba(255,180,0,0.35)" : "0 6px 24px rgba(255,180,0,0.15)",
         transition: "all 0.2s",
-      }}>Let's Get Started →</button>
+        opacity: loading ? 0.8 : 1
+      }}>
+      {loading ? (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+          <span style={{ width: 16, height: 16, border: "2px solid rgba(0,0,0,0.25)", borderTopColor: "#0D0D0D", borderRadius: "50%", display: "inline-block", animation: "spin 0.8s linear infinite" }} />
+          Setting up Workspace...
+        </span>
+      ) : "Let's Get Started →"}
+    </button>
   );
 }
 
@@ -211,10 +221,23 @@ function LaunchBtn({ onClick }) {
 export default function StudentInfo() {
   const navigate = useNavigate();
   const { state } = useLocation();
-  const account = state || {};
+  const [account, setAccount] = useState(state || {});
+
+  useEffect(() => {
+    getCurrentUserInfo().then(user => {
+      if (user) {
+        setAccount(prev => ({
+          ...prev,
+          name: user.name || state?.name || "",
+          email: user.email || state?.email || "",
+        }));
+      }
+    });
+  }, [state]);
 
   const [step, setStep] = useState(0);
   const [category, setCategory] = useState("");
+  const [launchLoading, setLaunchLoading] = useState(false);
 
   // ── Profile extras ──
   const [profileExtra, setProfileExtra] = useState({ dob: "", currentAddress: "", permanentAddress: "" });
@@ -787,11 +810,49 @@ export default function StudentInfo() {
                   </div>
                 ))}
               </div>
-              <LaunchBtn onClick={() => navigate("/dashboard", { state: {
-                ...account, category,
-                profileExtra, sec, sen, col, sch, sch10, sch12,
-                work, personal, intern, links, hasInternship,
-              }})} />
+              <LaunchBtn loading={launchLoading} onClick={async () => {
+                if (launchLoading) return;
+                setLaunchLoading(true);
+                let thresholdMs = 5000;
+                try {
+                  const pace = "average";
+
+                  // Timeout wrapper for threshold calculation
+                  const thresholdPromise = calculateThreshold(pace);
+                  const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 4000));
+
+                  const { base_threshold_ms } = await Promise.race([thresholdPromise, timeoutPromise]);
+                  thresholdMs = base_threshold_ms;
+                  localStorage.setItem("kiro_threshold_ms", thresholdMs.toString());
+                  console.log(`Setting personalized AI intervention threshold to ${thresholdMs}ms`);
+                } catch (e) {
+                  console.warn("Could not calculate threshold within timeout, defaulting to 5000ms", e);
+                  localStorage.setItem("kiro_threshold_ms", "5000");
+                }
+
+                // Save profile to DynamoDB via backend API
+                try {
+                  const profileData = {
+                    name: account.name || "",
+                    email: account.email || "",
+                    phone: account.phone || "",
+                    category: category || "college",
+                    profileExtra,
+                    sec, sen, col, sch, sch10, sch12,
+                    work, personal, intern, links, hasInternship,
+                  };
+                  await saveProfile(profileData);
+                  // Also cache locally so dashboard loads instantly
+                  const userInfo = await getCurrentUserInfo();
+                  if (userInfo?.uid) {
+                    localStorage.setItem(`aquire_profile_${userInfo.uid}`, JSON.stringify({ profile: profileData, onboardingData: {} }));
+                  }
+                } catch (err) {
+                  console.error("Error saving profile:", err);
+                }
+
+                navigate("/dashboard");
+              }} />
               <p style={{ marginTop: "1.2rem", fontSize: "0.72rem", color: "#1E1E1E" }}>
                 All your data is securely stored and used only to personalise your AQUIRE experience.
               </p>
