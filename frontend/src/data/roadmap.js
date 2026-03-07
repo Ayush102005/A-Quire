@@ -1,7 +1,7 @@
 ﻿export const ROADMAP = [
     {
         id: "dsa",
-        icon: "ðŸ§®", title: "Data Structures & Algorithms", subtitle: "Striver's A2Z Sheet - Complete DSA Course", color: "#FFD700",
+        icon: "", title: "Data Structures & Algorithms", subtitle: "Striver's A2Z Sheet - Complete DSA Course", color: "#FFD700",
         topics: [
             {
                 title: "Step 1: Learn the Basics",
@@ -471,7 +471,7 @@
     },
     {
         id: "web-dev",
-        icon: "ðŸŒ", title: "Web Development", subtitle: "HTML, CSS, JavaScript, React, Node.js", color: "#3B82F6",
+        icon: "", title: "Web Development", subtitle: "HTML, CSS, JavaScript, React, Node.js", color: "#3B82F6",
         topics: [
             {
                 title: "Step 1: Frontend Fundamentals",
@@ -507,7 +507,7 @@
     },
     {
         id: "os",
-        icon: "ðŸ’¾", title: "Operating Systems", subtitle: "Processes, Threads, Memory, File Systems", color: "#EC4899",
+        icon: "", title: "Operating Systems", subtitle: "Processes, Threads, Memory, File Systems", color: "#EC4899",
         topics: [
             {
                 title: "Step 1: Fundamentals",
@@ -531,7 +531,7 @@
     },
     {
         id: "cn",
-        icon: "ðŸ”—", title: "Computer Networks", subtitle: "TCP/IP, DNS, HTTP, OSI Model, Security", color: "#06B6D4",
+        icon: "", title: "Computer Networks", subtitle: "TCP/IP, DNS, HTTP, OSI Model, Security", color: "#06B6D4",
         topics: [
             {
                 title: "Step 1: Network Models",
@@ -555,7 +555,7 @@
     },
     {
         id: "dbms",
-        icon: "ðŸ—„ï¸", title: "DBMS", subtitle: "SQL, Normalisation, Indexing, Transactions", color: "#10B981",
+        icon: "", title: "DBMS", subtitle: "SQL, Normalisation, Indexing, Transactions", color: "#10B981",
         topics: [
             {
                 title: "Step 1: Database Design",
@@ -579,7 +579,7 @@
     },
     {
         id: "app-dev",
-        icon: "ðŸ“±", title: "App Development", subtitle: "React Native, Flutter, Mobile UI/UX", color: "#8B5CF6",
+        icon: "", title: "App Development", subtitle: "React Native, Flutter, Mobile UI/UX", color: "#8B5CF6",
         topics: [{
             title: "Step 1: Mobile Basics", items: [
                 { title: "React Native Setup & View Components", difficulty: "Easy", description: "React Native lets you build iOS and Android apps using JavaScript and React.\n\nSetup:\nâ€¢ npx react-native init MyApp (or Expo: npx create-expo-app)\nâ€¢ Expo: easiest start, managed workflow, no Xcode/Android Studio needed\n\nCore components:\nâ€¢ View â€” like <div>\nâ€¢ Text â€” all text must be in <Text>\nâ€¢ Image â€” <Image source={{uri:...}} />\nâ€¢ ScrollView â€” scrollable container\nâ€¢ FlatList â€” performant large lists\nâ€¢ TouchableOpacity â€” tappable element\nâ€¢ StyleSheet.create â€” CSS-like styles (no cascade)", examples: [{ input: "<View style={styles.container}><Text>Hello</Text></View>", output: "Renders a centered text on both iOS and Android", explanation: "React Native translates JSX into native UI components â€” not a WebView. Real native performance." }], starterCode: "import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';\n\nconst DATA = [{ id: '1', title: 'Item 1' }, { id: '2', title: 'Item 2' }];\n\nexport default function App() {\n    return (\n        <FlatList\n            data={DATA}\n            keyExtractor={item => item.id}\n            renderItem={({ item }) => (\n                <TouchableOpacity onPress={() => alert(item.title)}>\n                    <Text>{item.title}</Text>\n                </TouchableOpacity>\n            )}\n        />\n    );\n}" },
@@ -590,7 +590,7 @@
     },
     {
         id: "devops",
-        icon: "âš™ï¸", title: "DevOps", subtitle: "Docker, CI/CD, Kubernetes, Cloud, Linux", color: "#FF6A00",
+        icon: "", title: "DevOps", subtitle: "Docker, CI/CD, Kubernetes, Cloud, Linux", color: "#FF6A00",
         topics: [{
             title: "Step 1: Tooling", items: [
                 { title: "Linux Basics & Bash scripting", difficulty: "Easy", description: "Linux is the foundation of server infrastructure. Bash scripting automates repetitive tasks.\n\nEssential commands:\nâ€¢ ls, cd, pwd, mkdir, rm, cp, mv â€” file operations\nâ€¢ cat, less, head, tail, grep, awk, sed â€” text processing\nâ€¢ chmod, chown â€” permissions\nâ€¢ ps, top, kill â€” process management\nâ€¢ ssh, scp â€” remote access\nâ€¢ curl, wget â€” HTTP requests\n\nBash scripting:\nâ€¢ Variables: NAME='Alice'; echo $NAME\nâ€¢ Loops: for f in *.log; do ...; done\nâ€¢ Conditionals: if [ condition ]; then ... fi\nâ€¢ Functions: function deploy() { ... }", examples: [{ input: "Find all .log files > 100MB and delete them", output: "find /var/log -name '*.log' -size +100M -exec rm {} \\;" }], starterCode: "#!/bin/bash\n# Deployment script\nset -e  # Exit on error\n\nAPP_DIR='/var/www/myapp'\nBACKUP_DIR='/var/backups'\n\necho 'Starting deployment...'\n\n# Backup current build\ntar -czf \"$BACKUP_DIR/backup_$(date +%Y%m%d).tar.gz\" \"$APP_DIR\"\n\n# Pull latest code\ncd \"$APP_DIR\" && git pull origin main\n\n# Install and build\nnpm ci && npm run build\n\necho 'Deployment complete!'" },
@@ -602,7 +602,7 @@
     },
     {
         id: "aiml",
-        icon: "ðŸ¤–", title: "AI / ML", subtitle: "Regression, Neural Networks, NLP, CV", color: "#F59E0B",
+        icon: "", title: "AI / ML", subtitle: "Regression, Neural Networks, NLP, CV", color: "#F59E0B",
         topics: [{
             title: "Step 1: Core ML", items: [
                 { title: "Linear & Logistic Regression", difficulty: "Easy", description: "Foundation of supervised machine learning.\n\nLinear Regression:\nâ€¢ Predict continuous values (house price, temperature)\nâ€¢ y = wâ‚xâ‚ + wâ‚‚xâ‚‚ + ... + b\nâ€¢ Loss: Mean Squared Error (MSE)\nâ€¢ Optimize: Gradient Descent â€” update weights to minimize loss\n\nLogistic Regression:\nâ€¢ Predict binary classes (spam/not, yes/no)\nâ€¢ Outputs probability via sigmoid: Ïƒ(z) = 1/(1+e^-z)\nâ€¢ Loss: Binary Cross-Entropy\nâ€¢ Decision boundary at 0.5\n\nMetrics: Accuracy, Precision, Recall, F1, ROC-AUC", examples: [{ input: "House features: size=1500sqft, rooms=3", output: "Linear regression: predicted_price = w1*1500 + w2*3 + bias = $320,000" }], starterCode: "import numpy as np\nfrom sklearn.linear_model import LinearRegression, LogisticRegression\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.metrics import accuracy_score\n\n# Linear Regression\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)\nmodel = LinearRegression()\nmodel.fit(X_train, y_train)\npredictions = model.predict(X_test)\n\n# Logistic Regression\nclf = LogisticRegression()\nclf.fit(X_train, y_train)\naccuracy = accuracy_score(y_test, clf.predict(X_test))" },
@@ -614,7 +614,7 @@
     },
     {
         id: "data-science",
-        icon: "ðŸ“Š", title: "Data Science", subtitle: "Pandas, NumPy, Matplotlib, Statistics", color: "#A78BFA",
+        icon: "", title: "Data Science", subtitle: "Pandas, NumPy, Matplotlib, Statistics", color: "#A78BFA",
         topics: [{
             title: "Step 1: Data Mastery", items: [
                 { title: "Python Data Types", difficulty: "Easy", description: "Python's built-in data types form the foundation of all data science work.\n\nCore types:\nâ€¢ int, float, complex â€” numbers\nâ€¢ str â€” text (immutable)\nâ€¢ bool â€” True/False\nâ€¢ list â€” ordered, mutable: [1, 2, 3]\nâ€¢ tuple â€” ordered, immutable: (1, 2, 3)\nâ€¢ dict â€” key-value: {'name': 'Alice'}\nâ€¢ set â€” unique unordered: {1, 2, 3}\n\nType conversion: int(), float(), str(), list()\nList comprehension: [x**2 for x in range(10) if x%2==0]\nDictionary comprehension: {k:v for k,v in items.items()}", examples: [{ input: "words = ['apple','banana','apple','cherry']\nfreq = {w: words.count(w) for w in set(words)}", output: "{'apple': 2, 'banana': 1, 'cherry': 1}" }], starterCode: "# Data type exercises\ndata = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]\n\n# 1. Count frequency of each number\nfreq = {}\n# Your code here\n\n# 2. Get unique values sorted\nunique_sorted = sorted(set(data))\n\n# 3. Group numbers: evens and odds\ngroups = {'even': [x for x in data if x%2==0], 'odd': [x for x in data if x%2!=0]}" },
@@ -626,7 +626,7 @@
     },
     {
         id: "data-analysis",
-        icon: "ðŸ“ˆ", title: "Data Analysis", subtitle: "EDA, SQL Analytics, Tableau, Power BI", color: "#34D399",
+        icon: "", title: "Data Analysis", subtitle: "EDA, SQL Analytics, Tableau, Power BI", color: "#34D399",
         topics: [{
             title: "Step 1: Analytics Tools", items: [
                 { title: "SQL Window Functions & Analytics", difficulty: "Easy", description: "Window functions perform calculations across a set of rows related to the current row.\n\nSyntax: FUNCTION() OVER (PARTITION BY col ORDER BY col ROWS/RANGE ...)\n\nKey functions:\nâ€¢ ROW_NUMBER() â€” unique row number per partition\nâ€¢ RANK() / DENSE_RANK() â€” rank with/without gaps for ties\nâ€¢ LAG(col, n) / LEAD(col, n) â€” access previous/next row values\nâ€¢ SUM/AVG/COUNT OVER (...) â€” running/moving aggregates\nâ€¢ NTILE(n) â€” divide into n percentile buckets\nâ€¢ FIRST_VALUE / LAST_VALUE â€” first/last in window", examples: [{ input: "Get each employee's salary and rank within their department", output: "SELECT name, salary, RANK() OVER (PARTITION BY dept ORDER BY salary DESC) as dept_rank FROM employees", explanation: "PARTITION BY resets rank for each department. ORDER BY determines ranking order." }], starterCode: "-- Sales analysis: running total and month-over-month growth\nSELECT\n    month,\n    revenue,\n    SUM(revenue) OVER (ORDER BY month) as running_total,\n    LAG(revenue) OVER (ORDER BY month) as prev_month,\n    ROUND(100.0 * (revenue - LAG(revenue) OVER (ORDER BY month))\n          / LAG(revenue) OVER (ORDER BY month), 2) as growth_pct\nFROM monthly_sales;" },
@@ -637,7 +637,7 @@
     },
     {
         id: "system-design",
-        icon: "ðŸ—ï¸", title: "System Design", subtitle: "HLD, LLD, Scalability, CAP, Caching", color: "#F97316",
+        icon: "", title: "System Design", subtitle: "HLD, LLD, Scalability, CAP, Caching", color: "#F97316",
         topics: [{
             title: "Step 1: Architecture", items: [
                 { title: "High Level Design Abstractions", difficulty: "Medium", description: "HLD defines the architecture of a system â€” how components interact.\n\nSteps for any system design interview:\n1. Clarify requirements (functional + non-functional)\n2. Estimate scale (users, QPS, storage)\n3. Define API\n4. Data model\n5. High-level architecture (client, LB, servers, DB, cache)\n6. Deep dive on critical components\n\nCore components:\nâ€¢ DNS + CDN for static assets\nâ€¢ Load Balancer: distribute traffic\nâ€¢ Application servers (stateless)\nâ€¢ Primary DB + Read replicas\nâ€¢ Cache layer (Redis)\nâ€¢ Message queue (Kafka)\nâ€¢ Object storage (S3)", examples: [{ input: "Design a URL shortener (bit.ly)", output: "API: POST /shorten â†’ short_code. GET /:code â†’ 301 redirect.\nDB: URL mapping table. Cache: top short URLs in Redis. Hash function for codes." }], starterCode: "// URL Shortener â€” core logic\nconst BASE62 = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';\n\nfunction encode(num) {\n    let result = '';\n    while (num > 0) {\n        result = BASE62[num % 62] + result;\n        num = Math.floor(num / 62);\n    }\n    return result.padStart(6, BASE62[0]);\n}\n\n// Store: { shortCode â†’ originalUrl } in Redis (hot) + PostgreSQL (durable)" },
@@ -649,7 +649,7 @@
     },
     {
         id: "other",
-        icon: "ðŸ› ï¸", title: "Other Tech Stacks", subtitle: "Git, REST APIs, GraphQL, Open Source", color: "#60A5FA",
+        icon: "", title: "Other Tech Stacks", subtitle: "Git, REST APIs, GraphQL, Open Source", color: "#60A5FA",
         topics: [{
             title: "Step 1: Tools", items: [
                 { title: "Git Basics & Rebasing Mastery", difficulty: "Easy", description: "Git is the industry-standard version control system.\n\nEssentials:\nâ€¢ git init / clone â€” start repo\nâ€¢ git add / commit â€” stage and save changes\nâ€¢ git push / pull â€” sync with remote\nâ€¢ git branch / checkout / merge â€” branching\nâ€¢ git stash â€” temporarily shelve changes\nâ€¢ git log --oneline --graph â€” visual history\n\nAdvanced:\nâ€¢ git rebase: replay commits on top of another branch (clean linear history)\nâ€¢ Interactive rebase: git rebase -i HEAD~5 â€” squash, edit, reorder commits\nâ€¢ git cherry-pick: apply specific commit to another branch\nâ€¢ git bisect: binary search to find bug-introducing commit\nâ€¢ git reflog: undo almost anything", examples: [{ input: "Feature branch gets behind main by 20 commits", output: "git rebase main â€” replays your commits on top of latest main. Cleaner than merge for feature branches.", explanation: "Rebase rewrites commit history. Never rebase shared/public branches." }], starterCode: "# Common Git workflows\n\n# Feature branch workflow\ngit checkout -b feature/user-auth\n# ... make changes ...\ngit add -A && git commit -m 'feat: add JWT authentication'\ngit push origin feature/user-auth\n# Open PR on GitHub\n\n# Interactive rebase â€” clean up messy commits before PR\ngit rebase -i HEAD~3\n# squash 3 commits into 1\n\n# Undo last commit (keep changes staged)\ngit reset --soft HEAD~1" },

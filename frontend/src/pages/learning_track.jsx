@@ -209,7 +209,7 @@ export default function LearningTrack() {
                                 background: `${track.color}15`, border: `1px solid ${track.color}30`,
                                 display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2.8rem",
                             }}>
-                                {track.icon}
+                                {typeof track.icon === "string" ? track.icon : track.icon ? (() => { const Icon = track.icon; return <Icon size={40} color={track.color} strokeWidth={1.5} />; })() : null}
                             </div>
                             <div style={{ flex: 1 }}>
                                 <h1 style={{ fontFamily: "'Times New Roman', serif", fontSize: "2.6rem", fontWeight: 800, color: "#F0F0F0", lineHeight: 1.1, marginBottom: "0.4rem" }}>
