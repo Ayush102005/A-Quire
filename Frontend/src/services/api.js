@@ -193,7 +193,74 @@ export const api = {
     },
   },
 
-  // Lessons
+  // Instructor — course, module, lesson management
+  instructor: {
+    // Courses
+    async myCourses() {
+      return request("/courses/my-courses");
+    },
+    async createCourse(title, description = "") {
+      return request("/courses", {
+        method: "POST",
+        body: JSON.stringify({ title, description }),
+      });
+    },
+    async updateCourse(courseId, fields) {
+      return request(`/courses/${courseId}`, {
+        method: "PUT",
+        body: JSON.stringify(fields),
+      });
+    },
+    async deleteCourse(courseId) {
+      return request(`/courses/${courseId}`, { method: "DELETE" });
+    },
+    async publishCourse(courseId) {
+      return request(`/courses/${courseId}/publish`, { method: "POST" });
+    },
+    async unpublishCourse(courseId) {
+      return request(`/courses/${courseId}/unpublish`, { method: "POST" });
+    },
+    // Modules
+    async createModule(courseId, title, description = "", order = 1) {
+      return request(`/courses/${courseId}/modules`, {
+        method: "POST",
+        body: JSON.stringify({ title, description, order }),
+      });
+    },
+    async updateModule(moduleId, fields) {
+      return request(`/courses/modules/${moduleId}`, {
+        method: "PUT",
+        body: JSON.stringify(fields),
+      });
+    },
+    async deleteModule(moduleId) {
+      return request(`/courses/modules/${moduleId}`, { method: "DELETE" });
+    },
+    // Lessons
+    async createLesson(moduleId, title, videoUrl = "", description = "", order = 1, durationSeconds = 0) {
+      return request(`/courses/modules/${moduleId}/lessons`, {
+        method: "POST",
+        body: JSON.stringify({
+          title,
+          video_url: videoUrl || null,
+          description,
+          order,
+          duration_seconds: durationSeconds,
+        }),
+      });
+    },
+    async updateLesson(lessonId, fields) {
+      return request(`/courses/lessons/${lessonId}`, {
+        method: "PUT",
+        body: JSON.stringify(fields),
+      });
+    },
+    async deleteLesson(lessonId) {
+      return request(`/courses/lessons/${lessonId}`, { method: "DELETE" });
+    },
+  },
+
+  // Lessons (student read)
   lessons: {
     async get(id) {
       return request(`/content/lessons/${id}`);
