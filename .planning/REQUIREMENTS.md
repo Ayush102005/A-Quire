@@ -78,29 +78,29 @@
 
 | REQ-ID | Phase | Notes |
 |--------|-------|-------|
-| AI-01 | TBD | |
-| AI-02 | TBD | |
-| AI-03 | TBD | |
-| INFRA-01 | TBD | |
-| INFRA-02 | TBD | |
-| INFRA-03 | TBD | |
-| INFRA-04 | TBD | |
-| INFRA-05 | TBD | |
-| CONTENT-01 | TBD | |
-| CONTENT-02 | TBD | |
-| CONTENT-03 | TBD | |
-| CONTENT-04 | TBD | |
-| AUTH-01 | TBD | |
-| AUTH-02 | TBD | |
-| AUTH-03 | TBD | |
-| ANALYTICS-01 | TBD | |
-| ANALYTICS-02 | TBD | |
-| ANALYTICS-03 | TBD | |
-| ANALYTICS-04 | TBD | |
-| TEST-01 | TBD | |
-| TEST-02 | TBD | |
-| TEST-03 | TBD | |
-| TEST-04 | TBD | |
-| UI-01 | TBD | |
-| UI-02 | TBD | |
-| UI-03 | TBD | |
+| AI-01 | Phase 2 | Core feature — Bedrock wiring |
+| AI-02 | Phase 2 | Level-appropriate prompts |
+| AI-03 | Phase 2 | Auto-trigger via WebSocket |
+| INFRA-01 | Phase 1 | Critical blocker — deploy first |
+| INFRA-02 | Phase 1 | Alembic migration |
+| INFRA-03 | Phase 7 | Docker prod override |
+| INFRA-04 | Phase 7 | GitHub Actions CI/CD |
+| INFRA-05 | Phase 1 | Production CORS |
+| CONTENT-01 | Phase 4 | Problems bank seeder |
+| CONTENT-02 | Phase 4 | Instructor course creation UI |
+| CONTENT-03 | Phase 4 | Module & lesson management UI |
+| CONTENT-04 | Phase 4 | Rich text lesson notes |
+| AUTH-01 | Phase 3 | Email verification |
+| AUTH-02 | Phase 3 | Password reset |
+| AUTH-03 | Phase 3 | Rate limiting |
+| ANALYTICS-01 | Phase 5 | Student progress charts |
+| ANALYTICS-02 | Phase 5 | Struggle analytics |
+| ANALYTICS-03 | Phase 5 | Instructor heatmap |
+| ANALYTICS-04 | Phase 5 | Admin platform analytics |
+| TEST-01 | Phase 7 | Vitest frontend unit tests |
+| TEST-02 | Phase 7 | Playwright E2E |
+| TEST-03 | Phase 7 | Backend pytest-cov |
+| TEST-04 | Phase 7 | Frontend coverage report |
+| UI-01 | Phase 6 | Unified design system |
+| UI-02 | Phase 6 | Responsive layouts |
+| UI-03 | Phase 6 | Smooth animations + loading states |
