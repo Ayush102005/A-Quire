@@ -48,6 +48,16 @@ class Settings(BaseSettings):
     # Struggle score (0.0–1.0) above which a hint is auto-suggested to the student
     STRUGGLE_HINT_THRESHOLD: float = 0.7
 
+    # ── Email / SES ────────────────────────────────────────────────────────────
+    # Verified SES sender address (leave blank in dev — emails log to console)
+    SES_SENDER_EMAIL: str = ""
+    # Frontend base URL used in email links
+    FRONTEND_URL: str = "http://localhost:5173"
+
+    # ── Rate Limiting ─────────────────────────────────────────────────────────
+    # Max login attempts per minute per IP before 429 is returned
+    LOGIN_RATE_LIMIT: str = "10/minute"
+
     # ── AWS Bedrock (placeholder) ─────────────────────────────────────────────
     AWS_REGION: str = "us-east-1"
     AWS_ACCESS_KEY_ID: str = ""

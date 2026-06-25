@@ -115,6 +115,25 @@ export const api = {
     return request("/auth/me");
   },
 
+  async verifyEmail(token) {
+    // GET /auth/verify-email?token=<token>
+    return request(`/auth/verify-email?token=${encodeURIComponent(token)}`);
+  },
+
+  async forgotPassword(email) {
+    return request("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  async resetPassword(token, newPassword) {
+    return request("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, new_password: newPassword }),
+    });
+  },
+
   // Onboarding
   onboarding: {
     async getStatus() {
