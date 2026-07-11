@@ -4,6 +4,7 @@ import {
   Menu, X, Check, CheckCheck, BookMarked, Megaphone, Cpu, Info,
   ChevronRight, Clock, AlertTriangle, Sparkles, Trash2,
 } from 'lucide-react';
+import { api } from '../services/api';
 
 // ── Nav ────────────────────────────────────────────────────────────────────
 const NAV = [
@@ -50,16 +51,16 @@ const TAB_FILTER = {
 // ── Sidebar ────────────────────────────────────────────────────────────────
 function Sidebar({ open, onClose, unreadCount }) {
   const body = (
-    <div className="flex flex-col h-full bg-stone-50 border-r border-stone-200 w-64 p-6">
+    <div className="flex flex-col h-full sidebar-light w-64 p-6">
       <a href="/" className="inline-flex items-center gap-2 mb-10 pl-1">
         <div className="w-8 h-8 rounded bg-teal-700 text-white flex items-center justify-center font-bold text-base shadow-sm">A</div>
-        <span className="font-semibold text-xl tracking-tight text-stone-800">A-Quire</span>
+        <span className="font-semibold text-xl tracking-tight text-[var(--text)]">A-Quire</span>
       </a>
       <nav className="space-y-1 flex-1">
         {NAV.map(({ name, icon: Icon, href, active }) => (
           <a key={name} href={href}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active ? 'bg-white shadow-sm border border-stone-200 text-teal-800' : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'}`}>
-            <Icon className={`w-4 h-4 ${active ? 'text-teal-700' : 'text-stone-400'}`} />
+            className={`sidebar-nav-item ${active ? 'active' : ''}`}>
+            <Icon className="w-4 h-4 shrink-0" />
             <span className="flex-1">{name}</span>
             {name === 'Notifications' && unreadCount > 0 && (
               <span className="w-5 h-5 rounded-full bg-teal-600 text-white text-[10px] font-bold flex items-center justify-center">{unreadCount}</span>
@@ -67,24 +68,23 @@ function Sidebar({ open, onClose, unreadCount }) {
           </a>
         ))}
       </nav>
-      <div className="pt-6 border-t border-stone-200/60 space-y-1">
-        <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-600 hover:bg-stone-200/50 transition-colors"><User className="w-4 h-4 text-stone-400" />Profile</button>
-        <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-600 hover:bg-stone-200/50 transition-colors"><Settings className="w-4 h-4 text-stone-400" />Settings</button>
+      <div className="pt-6 border-t border-[var(--border)] space-y-1">
+        <button className="sidebar-nav-item"><User className="w-4 h-4 shrink-0" />Profile</button>
+        <button className="sidebar-nav-item"><Settings className="w-4 h-4 shrink-0" />Settings</button>
       </div>
     </div>
   );
   return (
     <>
       <div className="hidden lg:flex h-screen sticky top-0 shrink-0">{body}</div>
-      {open && (
-        <div className="lg:hidden fixed inset-0 z-50 bg-stone-900/50 backdrop-blur-sm" onClick={onClose}>
-          <div className="fixed inset-y-0 left-0 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="relative">{body}
-              <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-lg text-stone-500 hover:bg-stone-200"><X className="w-4 h-4" /></button>
-            </div>
+      {/* Mobile Sidebar */}
+      <div className={`lg:hidden fixed inset-0 z-50 bg-stone-900/50 backdrop-blur-sm transition-opacity duration-300 ${open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={onClose}>
+        <div className={`fixed inset-y-0 left-0 shadow-2xl transition-transform duration-300 ${open ? 'translate-x-0' : '-translate-x-full'}`} onClick={e => e.stopPropagation()}>
+          <div className="relative h-full">{body}
+            <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-lg text-stone-500 hover:bg-stone-200"><X className="w-4 h-4" /></button>
           </div>
         </div>
-      )}
+      </div>
     </>
   );
 }
@@ -153,13 +153,13 @@ function NotifItem({ notif, onRead, onDismiss }) {
 // ── Skeleton ───────────────────────────────────────────────────────────────
 function SkeletonItem() {
   return (
-    <div className="flex items-start gap-4 px-5 py-4 border-b border-stone-100 animate-pulse">
-      <div className="w-3 pt-1.5 shrink-0"><div className="w-2 h-2 rounded-full bg-stone-200" /></div>
-      <div className="w-9 h-9 rounded-xl bg-stone-200 shrink-0 mt-0.5" />
+    <div className="flex items-start gap-4 px-5 py-4 border-b border-stone-100">
+      <div className="w-3 pt-1.5 shrink-0"><div className="w-2 h-2 rounded-full animate-shimmer" /></div>
+      <div className="w-9 h-9 rounded-xl animate-shimmer shrink-0 mt-0.5" />
       <div className="flex-1 space-y-2 pt-0.5">
-        <div className="flex justify-between gap-4"><div className="h-3.5 bg-stone-200 rounded w-2/3" /><div className="h-3 bg-stone-100 rounded w-16 shrink-0" /></div>
-        <div className="h-3 bg-stone-100 rounded w-full" />
-        <div className="h-3 bg-stone-100 rounded w-4/5" />
+        <div className="flex justify-between gap-4"><div className="h-3.5 animate-shimmer rounded w-2/3" /><div className="h-3 animate-shimmer rounded w-16 shrink-0" /></div>
+        <div className="h-3 animate-shimmer rounded w-full" />
+        <div className="h-3 animate-shimmer rounded w-4/5" />
       </div>
     </div>
   );
@@ -173,7 +173,7 @@ function EmptyState({ tab }) {
         <Bell className="w-6 h-6 text-stone-400" />
       </div>
       <p className="text-sm font-semibold text-stone-700 mb-1">
-        {tab === 'Unread' ? 'All caught up!' : `No ${tab.toLowerCase()} notifications`}
+        {tab === 'Unread' ? 'All caught up!' : tab === 'All' ? 'No notifications' : `No ${tab.toLowerCase()} notifications`}
       </p>
       <p className="text-xs text-stone-400 max-w-xs leading-relaxed">
         {tab === 'Unread' ? "You've read everything. Check back after your next session." : 'Notifications of this type will appear here as you use the platform.'}
@@ -185,9 +185,56 @@ function EmptyState({ tab }) {
 // ── Main ──────────────────────────────────────────────────────────────────
 export default function Notifications() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [viewState, setViewState]   = useState('full'); // full | loading | empty
+  const [viewState, setViewState]   = useState('loading'); // full | loading | empty
   const [activeTab, setActiveTab]   = useState('All');
-  const [items, setItems]           = useState(INITIAL);
+  const [items, setItems]           = useState([]);
+
+  React.useEffect(() => {
+    loadNotifications();
+  }, []);
+
+  async function loadNotifications() {
+    try {
+      setViewState('loading');
+      const data = await api.notifications.list();
+      
+      const formatted = data.map(n => {
+        let type = 'system';
+        const lowerTitle = n.title.toLowerCase();
+        const lowerMsg = n.message.toLowerCase();
+        if (lowerTitle.includes('course') || lowerTitle.includes('lesson') || lowerTitle.includes('module')) type = 'course';
+        else if (lowerTitle.includes('mentor') || lowerTitle.includes('ai') || lowerTitle.includes('hint')) type = 'ai';
+        else if (lowerTitle.includes('reminder') || lowerMsg.includes('reminder')) type = 'reminder';
+        else if (lowerTitle.includes('update') || lowerTitle.includes('announce')) type = 'announce';
+        
+        const ms = new Date() - new Date(n.created_at);
+        const mins = Math.floor(ms / 60000);
+        const hrs = Math.floor(mins / 60);
+        const days = Math.floor(hrs / 24);
+        let ts = 'Just now';
+        if (days > 1) ts = `${days} days ago`;
+        else if (days === 1) ts = 'Yesterday';
+        else if (hrs > 0) ts = `${hrs} hour${hrs > 1 ? 's' : ''} ago`;
+        else if (mins > 0) ts = `${mins} min${mins > 1 ? 's' : ''} ago`;
+
+        return {
+          id: n.id,
+          type,
+          read: n.is_read,
+          ts,
+          title: n.title,
+          body: n.message,
+          action: null
+        };
+      });
+      setItems(formatted);
+      setViewState(formatted.length === 0 ? 'empty' : 'full');
+    } catch (e) {
+      console.error(e);
+      setItems(INITIAL);
+      setViewState('full');
+    }
+  }
 
   const unreadCount = items.filter(n => !n.read).length;
 
@@ -200,16 +247,30 @@ export default function Notifications() {
   const grouped = useMemo(() => {
     const groups = {};
     filtered.forEach(n => {
-      const key = n.ts.includes('min') || n.ts.includes('hour') ? 'Today' : n.ts === 'Yesterday' ? 'Yesterday' : 'Earlier';
+      const key = n.ts.includes('min') || n.ts.includes('hour') || n.ts === 'Just now' ? 'Today' : n.ts === 'Yesterday' ? 'Yesterday' : 'Earlier';
       if (!groups[key]) groups[key] = [];
       groups[key].push(n);
     });
     return groups;
   }, [filtered]);
 
-  function markRead(id) { setItems(prev => prev.map(n => n.id === id ? { ...n, read: true } : n)); }
-  function dismiss(id) { setItems(prev => prev.filter(n => n.id !== id)); }
-  function markAllRead() { setItems(prev => prev.map(n => ({ ...n, read: true }))); }
+  async function markRead(id) { 
+    try {
+      await api.notifications.markRead(id, true);
+      setItems(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    } catch (e) { console.error(e); }
+  }
+  
+  function dismiss(id) { 
+    setItems(prev => prev.filter(n => n.id !== id)); 
+  }
+  
+  async function markAllRead() { 
+    try {
+      await api.notifications.markAllRead();
+      setItems(prev => prev.map(n => ({ ...n, read: true })));
+    } catch (e) { console.error(e); }
+  }
 
   const tabCounts = useMemo(() => {
     const c = {};
@@ -218,33 +279,27 @@ export default function Notifications() {
   }, [items]);
 
   return (
-    <div className="min-h-screen bg-stone-50 font-sans text-stone-900 flex">
+    <div className="min-h-screen app-bg font-sans flex">
       <Sidebar open={mobileOpen} onClose={() => setMobileOpen(false)} unreadCount={unreadCount} />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
         {/* Topbar */}
-        <header className="sticky top-0 z-40 bg-stone-50/90 backdrop-blur-md border-b border-stone-200 px-4 sm:px-6 h-16 flex items-center justify-between shrink-0">
+        <header className="sticky top-0 z-40 app-header backdrop-blur-md px-4 sm:px-6 h-16 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <button className="lg:hidden p-2 -ml-2 text-stone-600 hover:bg-stone-200/50 rounded-lg" onClick={() => setMobileOpen(true)}><Menu className="w-5 h-5" /></button>
             <div className="hidden sm:block">
               <div className="flex items-center gap-2">
-                <p className="text-base font-semibold text-stone-900">Notifications</p>
+                <p className="text-base font-semibold text-[var(--text)]">Notifications</p>
                 {unreadCount > 0 && (
                   <span className="px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 text-xs font-bold">{unreadCount} unread</span>
                 )}
               </div>
-              <p className="text-xs text-stone-500">Stay on top of your learning activity</p>
+              <p className="text-xs text-[var(--text-muted)]">Stay on top of your learning activity</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {/* Dev toggles */}
-            {['full','loading','empty'].map(s => (
-              <button key={s} onClick={() => setViewState(s)}
-                className={`px-2.5 py-1 rounded-full text-[10px] font-semibold capitalize border transition-colors hidden sm:inline-flex ${viewState === s ? 'bg-teal-100 text-teal-800 border-teal-200' : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}>
-                {s}
-              </button>
-            ))}
+            {/* Dev toggles removed for production */}
             <button className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center border border-teal-200">
               <span className="text-sm font-bold text-teal-800">AS</span>
             </button>

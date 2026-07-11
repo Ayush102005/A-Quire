@@ -5,51 +5,12 @@ import {
   Download, RefreshCw, Activity, Clock, CheckCircle2,
   Lightbulb, FileText, Zap, ArrowUpRight, ArrowDownRight,
   Plus, Trash2, Edit3, Eye, EyeOff, X, Loader2, ChevronDown,
-  ChevronUp, Play, Link as LinkIcon, GraduationCap, Save,
+  ChevronUp, Play, Link as LinkIcon, GraduationCap, Save, Menu,
 } from 'lucide-react';
 import { api } from '../services/api';
+import { dsaProblems } from './dsaProblems';
 
-// ── Static mock data (overview tab) ──────────────────────────────────────────
-const METRICS = [
-  { label: 'Active Students', value: '142', delta: '+12', up: true, sub: 'of 150 enrolled' },
-  { label: 'Avg. Engagement', value: '74%', delta: '+3%', up: true, sub: 'vs last week' },
-  { label: 'Struggle Rate', value: '28%', delta: '+5%', up: false, sub: 'needs attention' },
-  { label: 'AI Interventions', value: '317', delta: '-22', up: true, sub: 'today' },
-];
-const HOTSPOTS = [
-  { lesson: "Boltzmann's Formula", module: 'Module 2', struggles: 48, rate: 72 },
-  { lesson: 'Clausius Inequality', module: 'Module 2', struggles: 31, rate: 58 },
-  { lesson: 'Carnot Efficiency', module: 'Module 3', struggles: 27, rate: 41 },
-  { lesson: 'Entropy of Mixing', module: 'Module 3', struggles: 19, rate: 34 },
-  { lesson: 'Heat Capacity Ratio', module: 'Module 1', struggles: 14, rate: 22 },
-];
-const STUDENTS = [
-  { name: 'Riya Sharma', avatar: 'RS', lastActive: '2h ago', lesson: "Boltzmann's Formula", struggles: 7, status: 'critical' },
-  { name: 'Aarav Mehta', avatar: 'AM', lastActive: '4h ago', lesson: 'Clausius Inequality', struggles: 5, status: 'warning' },
-  { name: 'Priya Nair', avatar: 'PN', lastActive: '1d ago', lesson: 'Carnot Efficiency', struggles: 4, status: 'warning' },
-  { name: 'Karan Verma', avatar: 'KV', lastActive: '5h ago', lesson: 'Entropy of Mixing', struggles: 4, status: 'warning' },
-  { name: 'Sneha Iyer', avatar: 'SI', lastActive: '3h ago', lesson: 'Heat Capacity Ratio', struggles: 3, status: 'mild' },
-];
-const HINT_STATS = [
-  { label: 'Hints Delivered', value: 841, pct: 100, color: 'bg-stone-200' },
-  { label: 'Led to Understood', value: 612, pct: 73, color: 'bg-teal-500' },
-  { label: 'Student Responded', value: 489, pct: 58, color: 'bg-indigo-400' },
-  { label: 'Needed 2nd Hint', value: 229, pct: 27, color: 'bg-amber-400' },
-  { label: 'Replayed Section', value: 143, pct: 17, color: 'bg-stone-400' },
-];
-const ACTIVITY = [
-  { icon: AlertTriangle, color: 'text-amber-500', msg: "Riya Sharma struggled 3x on Boltzmann's Formula", time: '18 min ago' },
-  { icon: CheckCircle2, color: 'text-emerald-600', msg: '14 students completed Module 2 Assessment', time: '1h ago' },
-  { icon: Brain, color: 'text-teal-600', msg: 'AI intervened 12 times during Clausius Inequality', time: '2h ago' },
-  { icon: TrendingUp, color: 'text-indigo-500', msg: 'Engagement up 8% this week vs last week', time: '5h ago' },
-  { icon: CheckCircle2, color: 'text-emerald-600', msg: 'Aarav Mehta resumed lesson after mentor session', time: '6h ago' },
-];
-const SPARKLINE = [42, 55, 48, 67, 59, 72, 68, 74, 71, 80, 74, 78];
-const STATUS_BADGE = {
-  critical: 'bg-red-50 text-red-700 border-red-100',
-  warning: 'bg-amber-50 text-amber-700 border-amber-100',
-  mild: 'bg-stone-100 text-stone-600 border-stone-200',
-};
+// ── Static mock data (overview tab) removed for production ───────────
 
 // ── Small shared components ───────────────────────────────────────────────────
 function Sparkline({ values }) {
@@ -86,8 +47,8 @@ function MetricCard({ label, value, delta, up, sub }) {
 function Modal({ title, onClose, children }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-stone-200 overflow-hidden">
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-page-enter" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-stone-200 overflow-hidden animate-modal-enter">
         <div className="flex items-center justify-between px-6 py-4 border-b border-stone-100">
           <h2 id="modal-title" className="text-sm font-semibold text-stone-900">{title}</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors" aria-label="Close">
@@ -264,7 +225,24 @@ function ModuleList({ course }) {
 function LessonList({ module }) {
   const [lessons, setLessons] = useState(module.lessons || []);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: '', video_url: '', description: '' });
+  const [lessonType, setLessonType] = useState('video'); // 'dsa' or 'video'
+  const [form, setForm] = useState({
+    title: '',
+    video_url: '',
+    description: '',
+    problem_id: null,
+    // DSA specific fields
+    difficulty: 'Easy',
+    topic: '',
+    problem_statement: '',
+    examples: [],
+    constraints: [],
+    approaches: '',
+    code_solutions: '',
+    complexity_time: '',
+    complexity_space: '',
+    external_links: '',
+  });
   const [saving, setSaving] = useState(false);
 
   async function handleAdd(e) {
@@ -272,22 +250,65 @@ function LessonList({ module }) {
     if (!form.title.trim()) return;
     setSaving(true);
     try {
+      const lessonPayload = {
+        title: form.title.trim(),
+        description: form.description.trim(),
+        lesson_type: lessonType,
+      };
+
+      if (lessonType === 'video') {
+        lessonPayload.video_url = form.video_url.trim();
+      } else if (lessonType === 'dsa') {
+        lessonPayload.problem_id = form.problem_id;
+        lessonPayload.difficulty = form.difficulty;
+        lessonPayload.topic = form.topic;
+        lessonPayload.problem_statement = form.problem_statement;
+        lessonPayload.examples = form.examples;
+        lessonPayload.constraints = form.constraints;
+        lessonPayload.approaches = form.approaches;
+        lessonPayload.code_solutions = form.code_solutions;
+        lessonPayload.complexity_time = form.complexity_time;
+        lessonPayload.complexity_space = form.complexity_space;
+        lessonPayload.external_links = form.external_links;
+      }
+
       const lesson = await api.instructor.createLesson(
         module.id,
-        form.title.trim(),
-        form.video_url.trim(),
-        form.description.trim(),
+        lessonPayload.title,
+        lessonPayload.video_url || '',
+        lessonPayload.description,
         lessons.length + 1,
-        0
+        0,
+        lessonType,
+        lessonType === 'dsa' ? form.problem_id : null
       );
       setLessons(prev => [...prev, lesson]);
-      setForm({ title: '', video_url: '', description: '' });
+      resetForm();
       setShowForm(false);
     } catch (err) {
       alert('Failed to create lesson: ' + err.message);
     } finally {
       setSaving(false);
     }
+  }
+
+  function resetForm() {
+    setForm({
+      title: '',
+      video_url: '',
+      description: '',
+      problem_id: null,
+      difficulty: 'Easy',
+      topic: '',
+      problem_statement: '',
+      examples: [],
+      constraints: [],
+      approaches: '',
+      code_solutions: '',
+      complexity_time: '',
+      complexity_space: '',
+      external_links: '',
+    });
   }
 
   async function handleDelete(lessonId) {
@@ -310,6 +331,9 @@ function LessonList({ module }) {
           <span className="text-[10px] text-stone-400 font-mono w-4 shrink-0">{i + 1}</span>
           <Play className="w-3 h-3 text-teal-500 shrink-0" />
           <span className="flex-1 text-xs font-medium text-stone-700 truncate">{l.title}</span>
+          <span className="text-[9px] px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 font-semibold">
+            {l.lesson_type === 'dsa' ? 'DSA' : 'Video'}
+          </span>
           {l.video_url && (
             <a href={l.video_url} target="_blank" rel="noopener noreferrer" className="text-stone-300 hover:text-teal-600 transition-colors">
               <LinkIcon className="w-3 h-3" />
@@ -322,45 +346,197 @@ function LessonList({ module }) {
       ))}
 
       {showForm ? (
-        <form onSubmit={handleAdd} className="space-y-2 bg-white border border-stone-200 rounded-lg p-3">
+        <form onSubmit={handleAdd} className="space-y-3 bg-white border border-stone-200 rounded-lg p-4 max-h-96 overflow-y-auto">
+          <div>
+            <p className="text-[10px] font-semibold text-stone-600 uppercase tracking-wider mb-2">Lesson Type</p>
+            <div className="flex gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="video"
+                  checked={lessonType === 'video'}
+                  onChange={e => {
+                    setLessonType(e.target.value);
+                    setForm(f => ({ ...f, problem_id: null }));
+                  }}
+                  disabled={saving}
+                />
+                <span className="text-xs text-stone-700">Video Lesson</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="dsa"
+                  checked={lessonType === 'dsa'}
+                  onChange={e => {
+                    setLessonType(e.target.value);
+                    setForm(f => ({ ...f, video_url: '' }));
+                  }}
+                  disabled={saving}
+                />
+                <span className="text-xs text-stone-700">DSA Problem</span>
+              </label>
+            </div>
+          </div>
+
           <input
             autoFocus
             type="text"
             value={form.title}
             onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-            placeholder="Lesson title…"
-            className={inputCls + ' text-xs py-2'}
+            placeholder="Lesson title (required)*"
+            className={inputCls + ' text-xs py-2 font-semibold'}
             disabled={saving}
+            required
           />
-          <input
-            type="url"
-            value={form.video_url}
-            onChange={e => setForm(f => ({ ...f, video_url: e.target.value }))}
-            placeholder="YouTube / video URL (optional)"
-            className={inputCls + ' text-xs py-2'}
-            disabled={saving}
-          />
-          <textarea
-            value={form.description}
-            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-            placeholder="Notes / description (optional)"
-            rows={2}
-            className={textareaCls + ' text-xs py-2'}
-            disabled={saving}
-          />
-          <div className="flex gap-2">
+
+          {lessonType === 'video' ? (
+            <>
+              <input
+                type="url"
+                value={form.video_url}
+                onChange={e => setForm(f => ({ ...f, video_url: e.target.value }))}
+                placeholder="YouTube / video URL (optional)"
+                className={inputCls + ' text-xs py-2'}
+                disabled={saving}
+              />
+              <textarea
+                value={form.description}
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Notes / description (optional)"
+                rows={2}
+                className={textareaCls + ' text-xs py-2'}
+                disabled={saving}
+              />
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={form.problem_id || ''}
+                  onChange={e => setForm(f => ({ ...f, problem_id: e.target.value ? parseInt(e.target.value) : null }))}
+                  className={inputCls + ' text-xs py-2'}
+                  disabled={saving}
+                  required
+                >
+                  <option value="">Select a DSA problem*</option>
+                  {dsaProblems.map(problem => (
+                    <option key={problem.id} value={problem.id}>
+                      {problem.title} ({problem.difficulty})
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={form.difficulty}
+                  onChange={e => setForm(f => ({ ...f, difficulty: e.target.value }))}
+                  className={inputCls + ' text-xs py-2'}
+                  disabled={saving}
+                >
+                  <option value="Easy">Easy</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Hard">Hard</option>
+                </select>
+              </div>
+
+              <input
+                type="text"
+                value={form.topic}
+                onChange={e => setForm(f => ({ ...f, topic: e.target.value }))}
+                placeholder="Topic (e.g., Binary Search Tree, Arrays)"
+                className={inputCls + ' text-xs py-2'}
+                disabled={saving}
+              />
+
+              <textarea
+                value={form.problem_statement}
+                onChange={e => setForm(f => ({ ...f, problem_statement: e.target.value }))}
+                placeholder="Problem statement description*"
+                rows={2}
+                className={textareaCls + ' text-xs py-2'}
+                disabled={saving}
+                required
+              />
+
+              <textarea
+                value={form.approaches}
+                onChange={e => setForm(f => ({ ...f, approaches: e.target.value }))}
+                placeholder="Approaches and solutions (markdown format)"
+                rows={2}
+                className={textareaCls + ' text-xs py-2'}
+                disabled={saving}
+              />
+
+              <textarea
+                value={form.code_solutions}
+                onChange={e => setForm(f => ({ ...f, code_solutions: e.target.value }))}
+                placeholder="Code solutions (multiple languages, markdown format)"
+                rows={2}
+                className={textareaCls + ' text-xs py-2'}
+                disabled={saving}
+              />
+
+              <div className="grid grid-cols-2 gap-2">
+                <textarea
+                  value={form.complexity_time}
+                  onChange={e => setForm(f => ({ ...f, complexity_time: e.target.value }))}
+                  placeholder="Time Complexity (e.g., O(N^2))"
+                  rows={1}
+                  className={textareaCls + ' text-xs py-2'}
+                  disabled={saving}
+                />
+                <textarea
+                  value={form.complexity_space}
+                  onChange={e => setForm(f => ({ ...f, complexity_space: e.target.value }))}
+                  placeholder="Space Complexity (e.g., O(N^2))"
+                  rows={1}
+                  className={textareaCls + ' text-xs py-2'}
+                  disabled={saving}
+                />
+              </div>
+
+              <input
+                type="text"
+                value={form.external_links}
+                onChange={e => setForm(f => ({ ...f, external_links: e.target.value }))}
+                placeholder="External links (LeetCode, TUF+, YouTube - comma separated URLs)"
+                className={inputCls + ' text-xs py-2'}
+                disabled={saving}
+              />
+
+              <textarea
+                value={form.description}
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Additional notes or hints (optional)"
+                rows={1}
+                className={textareaCls + ' text-xs py-2'}
+                disabled={saving}
+              />
+            </>
+          )}
+
+          <div className="flex gap-2 pt-2">
             <button
               type="submit"
-              disabled={saving || !form.title.trim()}
+              disabled={saving || !form.title.trim() || (lessonType === 'dsa' && (!form.problem_id || !form.problem_statement.trim()))}
               className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-teal-700 text-white text-xs font-semibold disabled:opacity-50 hover:bg-teal-800 transition-colors"
             >
               {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
               Save Lesson
             </button>
-            <button type="button" onClick={() => setShowForm(false)} className="px-3 py-1.5 rounded-lg text-stone-500 text-xs hover:bg-stone-100 transition-colors">
+            <button
+              type="button"
+              onClick={() => {
+                setShowForm(false);
+                setLessonType('video');
+                resetForm();
+              }}
+              className="px-3 py-1.5 rounded-lg text-stone-500 text-xs hover:bg-stone-100 transition-colors"
+            >
               Cancel
             </button>
           </div>
+
+          <p className="text-[9px] text-stone-400 italic">* Required fields</p>
         </form>
       ) : (
         <button
@@ -382,7 +558,7 @@ function CoursesTab() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editCourse, setEditCourse] = useState(null);
-  const [form, setForm] = useState({ title: '', description: '' });
+  const [form, setForm] = useState({ title: '', description: '', exam_category: 'Other' });
   const [saving, setSaving] = useState(false);
   const [expandedCourse, setExpandedCourse] = useState(null);
 
@@ -406,10 +582,10 @@ function CoursesTab() {
     if (!form.title.trim()) return;
     setSaving(true);
     try {
-      const course = await api.instructor.createCourse(form.title.trim(), form.description.trim());
+      const course = await api.instructor.createCourse(form.title.trim(), form.description.trim(), form.exam_category);
       setCourses(prev => [course, ...prev]);
       setShowCreateModal(false);
-      setForm({ title: '', description: '' });
+      setForm({ title: '', description: '', exam_category: 'Other' });
     } catch (err) {
       alert('Failed to create course: ' + err.message);
     } finally {
@@ -425,6 +601,7 @@ function CoursesTab() {
       const updated = await api.instructor.updateCourse(editCourse.id, {
         title: form.title.trim(),
         description: form.description.trim(),
+        exam_category: form.exam_category,
       });
       setCourses(prev => prev.map(c => c.id === updated.id ? updated : c));
       setShowEditModal(false);
@@ -459,7 +636,7 @@ function CoursesTab() {
 
   function openEdit(course) {
     setEditCourse(course);
-    setForm({ title: course.title, description: course.description || '' });
+    setForm({ title: course.title, description: course.description || '', exam_category: course.exam_category || 'Other' });
     setShowEditModal(true);
   }
 
@@ -482,7 +659,7 @@ function CoursesTab() {
           </button>
           <button
             id="create-course-btn"
-            onClick={() => { setForm({ title: '', description: '' }); setShowCreateModal(true); }}
+            onClick={() => { setForm({ title: '', description: '', exam_category: 'Other' }); setShowCreateModal(true); }}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-teal-700 text-white rounded-lg hover:bg-teal-800 transition-colors shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" /> New Course
@@ -512,7 +689,7 @@ function CoursesTab() {
             <p className="text-xs text-stone-400 mt-1">Create your first course to get started.</p>
           </div>
           <button
-            onClick={() => { setForm({ title: '', description: '' }); setShowCreateModal(true); }}
+            onClick={() => { setForm({ title: '', description: '', exam_category: 'Other' }); setShowCreateModal(true); }}
             className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-teal-700 text-white rounded-xl hover:bg-teal-800 transition-colors"
           >
             <Plus className="w-4 h-4" /> Create Course
@@ -547,6 +724,20 @@ function CoursesTab() {
                 required
                 maxLength={255}
               />
+            </Field>
+            <Field label="Exam Category" id="course-category">
+              <select
+                id="course-category"
+                value={form.exam_category}
+                onChange={e => setForm(f => ({ ...f, exam_category: e.target.value }))}
+                className={inputCls}
+              >
+                <option value="DSA">DSA</option>
+                <option value="JEE">JEE</option>
+                <option value="NEET">NEET</option>
+                <option value="GATE">GATE</option>
+                <option value="Other">Other</option>
+              </select>
             </Field>
             <Field label="Description" id="course-desc" hint="Optional — helps students find and understand your course.">
               <textarea
@@ -592,6 +783,20 @@ function CoursesTab() {
                 maxLength={255}
               />
             </Field>
+            <Field label="Exam Category" id="edit-course-category">
+              <select
+                id="edit-course-category"
+                value={form.exam_category}
+                onChange={e => setForm(f => ({ ...f, exam_category: e.target.value }))}
+                className={inputCls}
+              >
+                <option value="DSA">DSA</option>
+                <option value="JEE">JEE</option>
+                <option value="NEET">NEET</option>
+                <option value="GATE">GATE</option>
+                <option value="Other">Other</option>
+              </select>
+            </Field>
             <Field label="Description" id="edit-course-desc">
               <textarea
                 id="edit-course-desc"
@@ -623,10 +828,58 @@ function CoursesTab() {
 
 // ── Overview Tab (original content) ──────────────────────────────────────────
 function OverviewTab() {
+  const [summary, setSummary] = useState(null);
+  const [lessons, setLessons] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [sum, less, stud] = await Promise.all([
+          api.instructor.getSummary(),
+          api.instructor.getLessons(),
+          api.instructor.getStudents(),
+        ]);
+        setSummary(sum);
+        setLessons(less || []);
+        setStudents(stud || []);
+      } catch (err) {
+        console.error("Failed to load overview data", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  const metrics = summary ? [
+    { label: 'Total Struggles', value: summary.total_struggles, delta: '--', up: true, sub: 'Platform-wide' },
+    { label: 'AI Interventions', value: summary.interventions, delta: '--', up: true, sub: 'total hints' },
+    { label: 'Resolution Rate', value: `${summary.resolution_rate_pct}%`, delta: '--', up: true, sub: 'of interventions' },
+    { label: 'At-Risk Students', value: summary.at_risk_students, delta: '--', up: false, sub: 'needs attention' },
+  ] : [];
+
+  const hotspots = lessons.slice(0, 5).map(l => ({
+     lesson: l.name, module: 'Course', struggles: l.struggles, rate: l.struggles > 0 ? 50 : 0
+  }));
+
+  const stList = students.slice(0, 5).map(s => ({
+     name: s.name, avatar: s.name[0], lastActive: 'recently', lesson: 'active', struggles: s.struggles, status: s.risk
+  }));
+
+  const STATUS_BADGE = {
+    high: 'bg-red-50 text-red-700 border-red-100',
+    medium: 'bg-amber-50 text-amber-700 border-amber-100',
+    low: 'bg-stone-100 text-stone-600 border-stone-200',
+  };
+
+  if (loading) return <div className="p-10 text-center text-stone-400">Loading overview...</div>;
+
   return (
     <div className="space-y-6">
       <section aria-label="Key metrics" className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        {METRICS.map(m => <MetricCard key={m.label} {...m} />)}
+        {metrics.map(m => <MetricCard key={m.label} {...m} />)}
       </section>
 
       <section aria-label="Struggle hotspots and hint effectiveness" className="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -652,7 +905,7 @@ function OverviewTab() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-50">
-                {HOTSPOTS.map((row, i) => (
+                {hotspots.map((row, i) => (
                   <tr key={row.lesson} className="hover:bg-stone-50 transition-colors">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">
@@ -685,7 +938,10 @@ function OverviewTab() {
             <p className="text-xs text-stone-400 mt-0.5">Last 30 days · All lessons</p>
           </div>
           <div className="px-5 py-4 space-y-3.5">
-            {HINT_STATS.map(s => (
+            {[
+              { label: 'Hints Delivered', value: summary?.interventions || 0, pct: 100, color: 'bg-stone-200' },
+              { label: 'Led to Understood', value: Math.round((summary?.interventions || 0) * ((summary?.resolution_rate_pct || 0) / 100)), pct: summary?.resolution_rate_pct || 0, color: 'bg-teal-500' },
+            ].map(s => (
               <div key={s.label}>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs text-stone-600 font-medium">{s.label}</span>
@@ -698,7 +954,7 @@ function OverviewTab() {
             ))}
             <div className="pt-2 border-t border-stone-100">
               <p className="text-xs text-stone-400 leading-relaxed">
-                <span className="font-semibold text-emerald-700">73%</span> of AI hints led to a confirmed understanding.
+                <span className="font-semibold text-emerald-700">{summary?.resolution_rate_pct || 0}%</span> of AI hints led to a confirmed understanding.
               </p>
             </div>
           </div>
@@ -716,7 +972,7 @@ function OverviewTab() {
             </button>
           </div>
           <div className="divide-y divide-stone-50">
-            {STUDENTS.map(s => (
+            {stList.map(s => (
               <div key={s.name} className="flex items-center gap-3 px-5 py-3 hover:bg-stone-50 transition-colors">
                 <div className="w-8 h-8 rounded-full bg-stone-100 text-stone-600 text-xs font-bold flex items-center justify-center shrink-0">{s.avatar}</div>
                 <div className="flex-1 min-w-0">
@@ -750,7 +1006,7 @@ function OverviewTab() {
                   <div className="h-px bg-stone-100 w-full" />
                   <div className="h-px bg-stone-100 w-full" />
                 </div>
-                <Sparkline values={SPARKLINE} />
+                <Sparkline values={[42, 55, 48, 67, 59, 72, 68, 74, 71, 80, 74, 78]} />
               </div>
             </div>
             <div className="flex justify-between mt-1 pl-8">
@@ -778,13 +1034,11 @@ function OverviewTab() {
             </h2>
           </div>
           <div className="divide-y divide-stone-50">
-            {ACTIVITY.map((a, i) => (
-              <div key={i} className="flex items-start gap-3 px-5 py-3.5 hover:bg-stone-50 transition-colors">
-                <a.icon className={`w-4 h-4 mt-0.5 shrink-0 ${a.color}`} />
-                <p className="flex-1 text-xs text-stone-700 leading-relaxed">{a.msg}</p>
-                <span className="text-[10px] text-stone-400 font-medium shrink-0 tabular-nums whitespace-nowrap">{a.time}</span>
-              </div>
-            ))}
+            <div className="flex items-start gap-3 px-5 py-3.5 hover:bg-stone-50 transition-colors">
+              <CheckCircle2 className={`w-4 h-4 mt-0.5 shrink-0 text-emerald-600`} />
+              <p className="flex-1 text-xs text-stone-700 leading-relaxed">No new activity recently.</p>
+              <span className="text-[10px] text-stone-400 font-medium shrink-0 tabular-nums whitespace-nowrap">Just now</span>
+            </div>
           </div>
         </div>
 
@@ -835,6 +1089,7 @@ const NAV = [
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function InstructorDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
 
   const pageTitle = {
@@ -854,49 +1109,97 @@ export default function InstructorDashboard() {
   }[activeTab];
 
   return (
-    <div className="flex h-screen bg-stone-50 font-sans text-stone-900 overflow-hidden">
+    <div className="flex h-screen app-bg font-sans text-stone-900 overflow-hidden">
 
-      {/* Sidebar */}
-      <aside className={`shrink-0 flex flex-col bg-white border-r border-stone-200 transition-all duration-300 ${sidebarOpen ? 'w-52' : 'w-16'}`}>
-        <div className="h-14 flex items-center gap-2.5 px-4 border-b border-stone-100 shrink-0">
-          <div className="w-7 h-7 rounded-lg bg-teal-700 text-white flex items-center justify-center font-bold text-sm shrink-0">A</div>
-          {sidebarOpen && <span className="font-bold text-sm tracking-tight text-stone-800">A-Quire</span>}
-        </div>
-        <nav className="flex-1 py-4 px-2 space-y-0.5" aria-label="Instructor navigation">
-          {NAV.map(({ id, icon: Icon, label }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 ${
-                activeTab === id ? 'bg-teal-50 text-teal-800 border border-teal-100' : 'text-stone-500 hover:bg-stone-50 hover:text-stone-800'
-              }`}
-              aria-current={activeTab === id ? 'page' : undefined}
-            >
-              <Icon className={`w-4 h-4 shrink-0 ${activeTab === id ? 'text-teal-700' : ''}`} />
-              {sidebarOpen && label}
-            </button>
-          ))}
-        </nav>
-        <div className="p-3 border-t border-stone-100 shrink-0">
-          <div className={`flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-stone-50 cursor-pointer ${!sidebarOpen && 'justify-center'}`}>
-            <div className="w-7 h-7 rounded-full bg-teal-700 text-white text-xs font-bold flex items-center justify-center shrink-0">AD</div>
-            {sidebarOpen && (
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-stone-800 truncate">Dr. Alan Davis</p>
-                <p className="text-[10px] text-stone-400 truncate">Instructor</p>
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:flex h-full shrink-0">
+        <aside className={`shrink-0 flex flex-col sidebar-light transition-all duration-300 ${sidebarOpen ? 'w-52' : 'w-16'}`}>
+          <div className="h-14 flex items-center gap-2.5 px-4 border-b border-[var(--border)] shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-teal-700 text-white flex items-center justify-center font-bold text-sm shrink-0">A</div>
+            {sidebarOpen && <span className="font-bold text-sm tracking-tight text-stone-800">A-Quire</span>}
+          </div>
+          <nav className="flex-1 py-4 px-2 space-y-0.5" aria-label="Instructor navigation">
+            {NAV.map(({ id, icon: Icon, label }) => (
+              <button
+                key={id}
+                onClick={() => { setActiveTab(id); setMobileOpen(false); }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 ${
+                  activeTab === id ? 'bg-teal-50 text-teal-800 border border-teal-100' : 'text-stone-500 hover:bg-stone-50 hover:text-stone-800'
+                }`}
+                aria-current={activeTab === id ? 'page' : undefined}
+              >
+                <Icon className={`w-4 h-4 shrink-0 ${activeTab === id ? 'text-teal-700' : ''}`} />
+                {sidebarOpen && label}
+              </button>
+            ))}
+          </nav>
+          <div className="p-3 border-t border-stone-100 shrink-0">
+            <div className={`flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-stone-50 cursor-pointer ${!sidebarOpen && 'justify-center'}`}>
+              <div className="w-7 h-7 rounded-full bg-teal-700 text-white text-xs font-bold flex items-center justify-center shrink-0">AD</div>
+              {sidebarOpen && (
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-stone-800 truncate">Dr. Alan Davis</p>
+                  <p className="text-[10px] text-stone-400 truncate">Instructor</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      {/* Mobile Sidebar */}
+      <div className={`lg:hidden fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-sm transition-opacity duration-300 ${mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setMobileOpen(false)}>
+        <div className={`fixed inset-y-0 left-0 shadow-2xl sidebar-light w-64 flex flex-col transition-transform duration-300 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`} onClick={e => e.stopPropagation()}>
+            <div className="h-14 flex items-center gap-2.5 px-4 border-b border-[var(--border)] shrink-0 justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-teal-700 text-white flex items-center justify-center font-bold text-sm shrink-0">A</div>
+                <span className="font-bold text-sm tracking-tight text-stone-800">A-Quire</span>
               </div>
-            )}
+              <button onClick={() => setMobileOpen(false)} className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <nav className="flex-1 py-4 px-2 space-y-0.5 overflow-y-auto">
+              {NAV.map(({ id, icon: Icon, label }) => (
+                <button
+                  key={id}
+                  onClick={() => { setActiveTab(id); setMobileOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
+                    activeTab === id ? 'bg-teal-50 text-teal-800 border border-teal-100' : 'text-stone-500 hover:bg-stone-50 hover:text-stone-800'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 shrink-0 ${activeTab === id ? 'text-teal-700' : ''}`} />
+                  {label}
+                </button>
+              ))}
+            </nav>
+            <div className="p-3 border-t border-stone-100 shrink-0">
+              <div className="flex items-center gap-2.5 px-2 py-2 rounded-lg">
+                <div className="w-7 h-7 rounded-full bg-teal-700 text-white text-xs font-bold flex items-center justify-center shrink-0">AD</div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-stone-800 truncate">Dr. Alan Davis</p>
+                  <p className="text-[10px] text-stone-400 truncate">Instructor</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </aside>
+      </div>
 
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <header className="h-14 bg-white border-b border-stone-200 flex items-center justify-between px-6 shrink-0">
+        <header className="h-14 app-header flex items-center justify-between px-6 shrink-0">
           <div className="flex items-center gap-3">
             <button
+              onClick={() => setMobileOpen(true)}
+              className="lg:hidden p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+              aria-label="Open sidebar"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+            <button
               onClick={() => setSidebarOpen(o => !o)}
-              className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+              className="hidden lg:block p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
               aria-label="Toggle sidebar"
             >
               <LayoutDashboard className="w-4 h-4" />

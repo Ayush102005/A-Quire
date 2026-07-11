@@ -1,7 +1,7 @@
 import React,{useState}from'react';
 import{Home,BookOpen,Video,BrainCircuit,BarChart2,Bell,Settings,Menu,X,FileText,Download,Share2,ChevronRight,Clock,Users,TrendingUp,AlertTriangle,CheckCircle2,Loader2,Calendar,Filter}from'lucide-react';
 
-const NAV=[{name:'Dashboard',icon:Home,href:'/instructor'},{name:'My Courses',icon:BookOpen,href:'#'},{name:'Live Lessons',icon:Video,href:'#'},{name:'AI Mentor',icon:BrainCircuit,href:'#'},{name:'Analytics',icon:BarChart2,href:'/struggle-analytics'},{name:'Reports',icon:FileText,href:'/reports',active:true},{name:'Notifications',icon:Bell,href:'#'}];
+const NAV=[{name:'Dashboard',icon:Home,href:'/instructor'},{name:'My Courses',icon:BookOpen,href:'#'},{name:'Live Lessons',icon:Video,href:'#'},{name:'AI Mentor',icon:BrainCircuit,href:'#'},{name:'Analytics',icon:BarChart2,href:'/reports'},{name:'Reports',icon:FileText,href:'/reports',active:true},{name:'Notifications',icon:Bell,href:'#'}];
 const REPORT_TYPES=[{id:'engagement',label:'Engagement Report',desc:'Attendance, watch time, and interaction rates'},{id:'struggle',label:'Struggle & Recovery',desc:'AI interventions, struggle hotspots, resolution rates'},{id:'outcomes',label:'Learning Outcomes',desc:'Quiz scores, concept mastery, and grade distribution'},{id:'cohort',label:'Cohort Comparison',desc:'Side-by-side comparison across batches or semesters'}];
 const COURSES=['Data Structures & Algorithms','Operating Systems','Computer Networks','DBMS'];
 const BATCHES=['Fall 2026 – Batch A','Fall 2026 – Batch B','Spring 2026'];
@@ -11,8 +11,8 @@ const INSIGHTS=[{type:'positive',text:'Class engagement improved 6% after the in
 const TYPE_COLOR={engagement:'bg-teal-100 text-teal-700',struggle:'bg-amber-100 text-amber-700',outcomes:'bg-emerald-100 text-emerald-700',cohort:'bg-violet-100 text-violet-700'};
 
 function Sidebar({open,onClose}){
-  const body=(<div className="flex flex-col h-full bg-stone-50 border-r border-stone-200 w-64 p-6"><a href="/" className="inline-flex items-center gap-2 mb-10 pl-1"><div className="w-8 h-8 rounded bg-teal-700 text-white flex items-center justify-center font-bold text-base shadow-sm">A</div><span className="font-semibold text-xl tracking-tight text-stone-800">A-Quire</span></a><nav className="space-y-1 flex-1">{NAV.map(({name,icon:Icon,href,active})=>(<a key={name} href={href} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active?'bg-white shadow-sm border border-stone-200 text-teal-800':'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'}`}><Icon className={`w-4 h-4 ${active?'text-teal-700':'text-stone-400'}`}/>{name}</a>))}</nav><div className="pt-6 border-t border-stone-200/60"><button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-600 hover:bg-stone-200/50 transition-colors"><Settings className="w-4 h-4 text-stone-400"/>Settings</button></div></div>);
-  return(<><div className="hidden lg:flex h-screen sticky top-0 shrink-0">{body}</div>{open&&(<div className="lg:hidden fixed inset-0 z-50 bg-stone-900/50 backdrop-blur-sm" onClick={onClose}><div className="fixed inset-y-0 left-0 shadow-2xl" onClick={e=>e.stopPropagation()}><div className="relative">{body}<button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-lg text-stone-500 hover:bg-stone-200"><X className="w-4 h-4"/></button></div></div></div>)}</>);
+  const body=(<div className="flex flex-col h-full sidebar-light w-64 p-6"><a href="/" className="inline-flex items-center gap-2 mb-10 pl-1"><div className="w-8 h-8 rounded bg-teal-700 text-white flex items-center justify-center font-bold text-base shadow-sm">A</div><span className="font-semibold text-xl tracking-tight text-[var(--text)]">A-Quire</span></a><nav className="space-y-1 flex-1">{NAV.map(({name,icon:Icon,href,active})=>(<a key={name} href={href} className={`sidebar-nav-item ${active?'active':''}`}><Icon className="w-4 h-4 shrink-0"/>{name}</a>))}</nav><div className="pt-6 border-t border-[var(--border)]"><button className="sidebar-nav-item"><Settings className="w-4 h-4 shrink-0"/>Settings</button></div></div>);
+  return(<><div className="hidden lg:flex h-screen sticky top-0 shrink-0">{body}</div><div className={`lg:hidden fixed inset-0 z-50 bg-stone-900/50 backdrop-blur-sm transition-opacity duration-300 ${open?'opacity-100 pointer-events-auto':'opacity-0 pointer-events-none'}`} onClick={onClose}><div className={`fixed inset-y-0 left-0 shadow-2xl transition-transform duration-300 ${open?'translate-x-0':'-translate-x-full'}`} onClick={e=>e.stopPropagation()}><div className="relative h-full">{body}<button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-lg text-stone-500 hover:bg-stone-200"><X className="w-4 h-4"/></button></div></div></div></>);
 }
 
 function Sel({label,options,value,onChange}){
@@ -40,14 +40,14 @@ export default function InstructorReports(){
   }
 
   return(
-    <div className="min-h-screen bg-stone-50 font-sans text-stone-900 flex">
+    <div className="min-h-screen app-bg font-sans flex">
       <Sidebar open={mobileOpen} onClose={()=>setMobileOpen(false)}/>
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-        <header className="sticky top-0 z-40 bg-stone-50/90 backdrop-blur-md border-b border-stone-200 px-4 sm:px-6 h-16 flex items-center justify-between shrink-0">
+        <header className="sticky top-0 z-40 app-header backdrop-blur-md px-4 sm:px-6 h-16 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <button className="lg:hidden p-2 -ml-2 text-stone-600 hover:bg-stone-200/50 rounded-lg" onClick={()=>setMobileOpen(true)}><Menu className="w-5 h-5"/></button>
-            <div className="hidden sm:block"><p className="text-base font-semibold text-stone-900">Reports</p><p className="text-xs text-stone-500">Generate and export course analytics reports</p></div>
+            <div className="hidden sm:block"><p className="text-base font-semibold text-[var(--text)]">Reports</p><p className="text-xs text-[var(--text-muted)]">Generate and export course analytics reports</p></div>
           </div>
           <button className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center border border-violet-200"><span className="text-sm font-bold text-violet-800">AM</span></button>
         </header>
@@ -99,10 +99,10 @@ export default function InstructorReports(){
 
             {/* Report preview */}
             {viewState==='loading'&&(
-              <div className="bg-white border border-stone-200 rounded-2xl shadow-sm p-10 flex flex-col items-center gap-4 animate-pulse">
-                <div className="w-12 h-12 rounded-full bg-stone-200 flex items-center justify-center"><BarChart2 className="w-6 h-6 text-stone-400"/></div>
-                <div className="space-y-2 w-full max-w-xs"><div className="h-4 bg-stone-200 rounded w-2/3 mx-auto"/><div className="h-3 bg-stone-100 rounded w-1/2 mx-auto"/></div>
-                <div className="w-full space-y-3 max-w-2xl"><div className="h-3 bg-stone-200 rounded"/><div className="h-3 bg-stone-100 rounded w-5/6"/><div className="h-3 bg-stone-200 rounded w-4/5"/></div>
+              <div className="bg-white border border-stone-200 rounded-2xl shadow-sm p-10 flex flex-col items-center gap-4">
+                <div className="w-12 h-12 rounded-full animate-shimmer" />
+                <div className="space-y-2 w-full max-w-xs"><div className="h-4 animate-shimmer rounded w-2/3 mx-auto"/><div className="h-3 animate-shimmer rounded w-1/2 mx-auto"/></div>
+                <div className="w-full space-y-3 max-w-2xl"><div className="h-3 animate-shimmer rounded"/><div className="h-3 animate-shimmer rounded w-5/6"/><div className="h-3 animate-shimmer rounded w-4/5"/></div>
               </div>
             )}
 

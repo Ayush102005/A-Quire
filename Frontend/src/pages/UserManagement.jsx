@@ -22,8 +22,8 @@ const USERS=[
 const PAGE_SIZE=8;
 
 function Sidebar({open,onClose}){
-  const b=(<div className="flex flex-col h-full bg-stone-900 w-64 p-5"><a href="/" className="inline-flex items-center gap-2 mb-10 pl-1"><div className="w-8 h-8 rounded bg-amber-500 text-white flex items-center justify-center font-bold text-base shadow-sm">A</div><span className="font-semibold text-xl tracking-tight text-white">A-Quire</span></a><nav className="space-y-1 flex-1">{NAV.map(({name,icon:Icon,href,active})=>(<a key={name} href={href} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active?'bg-white/10 text-white':'text-stone-400 hover:bg-white/5 hover:text-stone-200'}`}><Icon className={`w-4 h-4 ${active?'text-amber-400':'text-stone-500'}`}/>{name}</a>))}</nav><div className="pt-5 border-t border-stone-700/50"><div className="flex items-center gap-2.5 px-2"><div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center text-xs font-bold text-white">SA</div><div><p className="text-xs font-semibold text-white">Super Admin</p><p className="text-[10px] text-stone-400">admin@aquire.io</p></div></div></div></div>);
-  return(<><div className="hidden lg:flex h-screen sticky top-0 shrink-0">{b}</div>{open&&(<div className="lg:hidden fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-sm" onClick={onClose}><div className="fixed inset-y-0 left-0 shadow-2xl" onClick={e=>e.stopPropagation()}><div className="relative">{b}<button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-lg text-stone-400 hover:bg-white/10"><X className="w-4 h-4"/></button></div></div></div>)}</>);
+  const b=(<div className="flex flex-col h-full sidebar-dark w-64 p-5"><a href="/" className="inline-flex items-center gap-2 mb-10 pl-1"><div className="w-8 h-8 rounded bg-teal-600 text-white flex items-center justify-center font-bold text-base shadow-sm">A</div><span className="font-semibold text-xl tracking-tight text-[var(--text)]">A-Quire</span></a><nav className="space-y-1 flex-1">{NAV.map(({name,icon:Icon,href,active})=>(<a key={name} href={href} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active?'bg-white/10 text-[var(--sidebar-active-text)]':'text-[var(--sidebar-text)] hover:bg-white/5 hover:text-stone-200'}`}><Icon className={`w-4 h-4 ${active?'text-amber-400':'text-stone-500'}`}/>{name}</a>))}</nav><div className="pt-5 border-t border-[var(--sidebar-border)]"><div className="flex items-center gap-2.5 px-2"><div className="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-xs font-bold text-white">SA</div><div><p className="text-xs font-semibold text-[var(--text)]">Super Admin</p><p className="text-[10px] text-[var(--sidebar-text)]">admin@aquire.io</p></div></div></div></div>);
+  return(<><div className="hidden lg:flex h-screen sticky top-0 shrink-0">{b}</div><div className={`lg:hidden fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-sm transition-opacity duration-300 ${open?'opacity-100 pointer-events-auto':'opacity-0 pointer-events-none'}`} onClick={onClose}><div className={`fixed inset-y-0 left-0 shadow-2xl transition-transform duration-300 ${open?'translate-x-0':'-translate-x-full'}`} onClick={e=>e.stopPropagation()}><div className="relative h-full">{b}<button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-lg text-stone-400 hover:bg-white/10"><X className="w-4 h-4"/></button></div></div></div></>);
 }
 
 function Badge({label,style}){return<span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border capitalize ${style}`}>{label}</span>;}
@@ -32,8 +32,8 @@ function Drawer({user,onClose,onAction}){
   if(!user)return null;
   return(
     <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="fixed inset-0 bg-stone-900/30 backdrop-blur-sm" onClick={onClose}/>
-      <div className="relative w-full max-w-md bg-white shadow-2xl flex flex-col overflow-y-auto">
+      <div className="fixed inset-0 bg-stone-900/30 backdrop-blur-sm animate-page-enter" onClick={onClose}/>
+      <div className="relative w-full max-w-md bg-white shadow-2xl flex flex-col overflow-y-auto animate-drawer-enter">
         <div className="flex items-center justify-between px-6 py-5 border-b border-stone-200 sticky top-0 bg-white z-10">
           <h2 className="text-base font-semibold text-stone-900">User Details</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700"><X className="w-4 h-4"/></button>
@@ -112,15 +112,15 @@ export default function UserManagement(){
   );
 
   return(
-    <div className="min-h-screen bg-stone-100 font-sans text-stone-900 flex">
+    <div className="min-h-screen app-bg font-sans flex">
       <Sidebar open={mobileOpen} onClose={()=>setMobileOpen(false)}/>
       {drawer&&<Drawer user={drawer} onClose={()=>setDrawer(null)} onAction={handleAction}/>}
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-stone-200 px-4 sm:px-6 h-16 flex items-center justify-between shrink-0 shadow-sm">
+        <header className="sticky top-0 z-40 app-header backdrop-blur-md px-4 sm:px-6 h-16 flex items-center justify-between shrink-0 shadow-sm">
           <div className="flex items-center gap-3">
             <button className="lg:hidden p-2 -ml-2 text-stone-600 hover:bg-stone-200/50 rounded-lg" onClick={()=>setMobileOpen(true)}><Menu className="w-5 h-5"/></button>
-            <div className="hidden sm:block"><p className="text-base font-semibold text-stone-900">User Management</p><p className="text-xs text-stone-500">{users.length} total users</p></div>
+            <div className="hidden sm:block"><p className="text-base font-semibold text-[var(--text)]">User Management</p><p className="text-xs text-[var(--text-muted)]">{users.length} total users</p></div>
           </div>
           <div className="flex items-center gap-2">
             {['full','loading','empty'].map(s=>(<button key={s} onClick={()=>setViewState(s)} className={`px-2.5 py-1 rounded-full text-[10px] font-semibold capitalize border transition-colors hidden sm:inline-flex ${viewState===s?'bg-amber-100 text-amber-800 border-amber-200':'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}>{s}</button>))}
