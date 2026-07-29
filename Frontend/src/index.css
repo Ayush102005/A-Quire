@@ -226,6 +226,25 @@
     color: var(--sidebar-active-text);
   }
 
+  /* Light sidebar active overrides — uses teal-50/teal-800 in light mode */
+  .sidebar-light .sidebar-nav-item.active {
+    background-color: #F0FDFA;
+    color: #134E4A;
+    border: 1px solid #A7F3D0;
+  }
+  .sidebar-light .sidebar-nav-item.active svg {
+    color: #0F766E;
+  }
+  .dark .sidebar-light .sidebar-nav-item.active {
+    background-color: rgba(20,184,166,0.15);
+    color: var(--sidebar-active-text);
+    border: 1px solid rgba(20,184,166,0.25);
+  }
+  .dark .sidebar-light .sidebar-nav-item.active svg {
+    color: var(--sidebar-active-text);
+  }
+
+
   /* --- App Header Glass --- */
   .app-header {
     background: var(--header-bg);
@@ -512,4 +531,81 @@
   .hover-lift { transition: transform 0.2s ease, box-shadow 0.2s ease; }
   .hover-lift:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
   .dark .hover-lift:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
+
+  /* ── 06-04 additions: richer micro-animations ── */
+
+  @keyframes springIn {
+    0%   { opacity: 0; transform: scale(0.94) translateY(6px); }
+    60%  { opacity: 1; transform: scale(1.01) translateY(-2px); }
+    100% { opacity: 1; transform: scale(1)    translateY(0); }
+  }
+  @keyframes bounceIn {
+    0%   { opacity: 0; transform: scale(0.7);  }
+    60%  { opacity: 1; transform: scale(1.08); }
+    80%  {             transform: scale(0.96); }
+    100% {             transform: scale(1);    }
+  }
+  @keyframes toastSlideUp {
+    from { opacity: 0; transform: translateY(100%) scale(0.95); }
+    to   { opacity: 1; transform: translateY(0)    scale(1);    }
+  }
+  @keyframes toastFadeOut {
+    from { opacity: 1; transform: translateX(0); }
+    to   { opacity: 0; transform: translateX(20px); }
+  }
+  @keyframes spinSlow {
+    to { transform: rotate(360deg); }
+  }
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.92); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @keyframes ripple {
+    0%   { transform: scale(0);   opacity: 0.6; }
+    100% { transform: scale(2.5); opacity: 0;   }
+  }
+
+  .animate-spring-in    { animation: springIn    0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+  .animate-bounce-in    { animation: bounceIn    0.4s  cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+  .animate-toast-up     { animation: toastSlideUp  0.3s  cubic-bezier(0.16, 1, 0.3, 1)    both; }
+  .animate-toast-out    { animation: toastFadeOut  0.2s  ease                              both; }
+  .animate-spin-slow    { animation: spinSlow 2s linear infinite; }
+  .animate-scale-in     { animation: scaleIn    0.2s  ease                              both; }
+
+  /* Interactive element feedback */
+  .press-scale { transition: transform 0.1s ease; }
+  .press-scale:active { transform: scale(0.97); }
+
+  /* Card hover with glow */
+  .card-hover {
+    transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  }
+  .card-hover:hover {
+    box-shadow: 0 4px 24px rgba(20, 184, 166, 0.08), 0 1px 4px rgba(0,0,0,0.06);
+    transform: translateY(-1px);
+    border-color: rgba(20,184,166,0.2);
+  }
+  .dark .card-hover:hover {
+    box-shadow: 0 4px 24px rgba(20,184,166,0.12), 0 1px 4px rgba(0,0,0,0.2);
+  }
+
+  /* Mentor hint pulse ring */
+  .hint-ring {
+    animation: pulse-teal 2s infinite;
+    border: 2px solid rgba(20,184,166,0.3);
+  }
+
+  /* Focus ring polished */
+  .focus-ring:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(20,184,166,0.35);
+  }
+
+  /* Skeleton - theme-aware */
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 6px;
+  }
 }

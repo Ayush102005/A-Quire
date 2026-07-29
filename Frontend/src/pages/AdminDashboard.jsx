@@ -6,6 +6,7 @@ import {
   Download, RefreshCw, Eye, Ban, Flag, Zap, Globe, Lock,
   ArrowUpRight, ArrowDownRight, Brain,
 } from 'lucide-react';
+import ThemeToggle from '../components/ThemeToggle';
 
 const METRICS = [
   { label: 'Total Users', value: '24,891', delta: '+342', up: true, sub: 'across all roles' },
@@ -54,7 +55,7 @@ const HEALTH = [
   { label: 'Storage', status: 'operational', latency: '24ms', uptime: '99.97%' },
 ];
 
-const SEV = { high: 'bg-red-50 text-red-700 border-red-100', medium: 'bg-amber-50 text-amber-700 border-amber-100', low: 'bg-stone-100 text-stone-500 border-stone-200' };
+const SEV = { high: 'bg-red-50 text-red-700 border-red-100', medium: 'bg-amber-50 text-amber-700 border-amber-100', low: 'bg-[var(--surface)] text-[var(--text-muted)] border-[var(--border)]' };
 const AUDIT_DOT = { danger: 'bg-red-500', success: 'bg-emerald-500', warn: 'bg-amber-400', info: 'bg-indigo-400' };
 const PLAN_STATUS = { healthy: 'bg-emerald-50 text-emerald-700 border-emerald-100', 'at-risk': 'bg-amber-50 text-amber-700 border-amber-100', trial: 'bg-indigo-50 text-indigo-700 border-indigo-100' };
 const STATUS_CFG = {
@@ -75,10 +76,10 @@ const NAV = [
 
 function SectionHeader({ title, sub, action }) {
   return (
-    <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 bg-stone-50/40">
+    <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] bg-[var(--surface)]">
       <div>
-        <h2 className="text-sm font-semibold text-stone-900 leading-none">{title}</h2>
-        {sub && <p className="text-[11px] text-stone-400 mt-1 font-medium">{sub}</p>}
+        <h2 className="text-sm font-semibold text-[var(--text)] leading-none">{title}</h2>
+        {sub && <p className="text-[11px] text-[var(--text-muted)] mt-1 font-medium">{sub}</p>}
       </div>
       {action && (
         <button className="text-xs font-semibold text-teal-700 hover:text-teal-800 flex items-center gap-1 px-2.5 py-1.5 rounded-lg hover:bg-teal-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400">
@@ -91,15 +92,15 @@ function SectionHeader({ title, sub, action }) {
 
 function MetricCard({ label, value, delta, up, sub }) {
   return (
-    <div className="bg-white border border-stone-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-4">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 leading-none">{label}</p>
-      <p className="text-3xl font-bold text-stone-900 tabular-nums leading-none">{value}</p>
-      <div className="flex items-center gap-2 pt-1 border-t border-stone-100">
+    <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-4">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] leading-none">{label}</p>
+      <p className="text-3xl font-bold text-[var(--text)] tabular-nums leading-none">{value}</p>
+      <div className="flex items-center gap-2 pt-1 border-t border-[var(--border)]">
         <span className={`inline-flex items-center gap-0.5 text-xs font-semibold px-1.5 py-0.5 rounded ${up ? 'text-emerald-700 bg-emerald-50' : 'text-red-700 bg-red-50'}`}>
           {up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
           {delta}
         </span>
-        <span className="text-[11px] text-stone-400 font-medium">{sub}</span>
+        <span className="text-[11px] text-[var(--text-muted)] font-medium">{sub}</span>
       </div>
     </div>
   );
@@ -110,11 +111,11 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('');
 
   return (
-    <div className="flex h-screen bg-[#F5F5F4] font-sans text-stone-900 overflow-hidden text-[13px]">
+    <div className="flex h-screen app-bg font-sans text-[var(--text)] overflow-hidden text-[13px]">
 
       {/* Sidebar */}
-      <aside className={`shrink-0 bg-[#1C1917] text-stone-300 flex flex-col border-r border-stone-800 transition-all duration-200 ${collapsed ? 'w-14' : 'w-52'}`}>
-        <div className="h-12 flex items-center gap-2.5 px-3.5 border-b border-stone-800 shrink-0">
+      <aside className={`shrink-0 sidebar-dark flex flex-col border-r border-[var(--sidebar-border)] transition-all duration-200 ${collapsed ? 'w-14' : 'w-52'}`}>
+        <div className="h-12 flex items-center gap-2.5 px-3.5 border-b border-[var(--sidebar-border)] shrink-0">
           <div className="w-7 h-7 rounded-lg bg-teal-600 text-white flex items-center justify-center font-bold text-sm shrink-0">A</div>
           {!collapsed && (
             <div className="flex items-center gap-1.5 min-w-0">
@@ -130,8 +131,8 @@ export default function AdminDashboard() {
               key={label}
               title={collapsed ? label : undefined}
               aria-current={active ? 'page' : undefined}
-              className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${
-                active ? 'bg-teal-600/20 text-teal-300 border border-teal-600/30' : 'text-stone-400 hover:bg-stone-800 hover:text-stone-200'
+              className={`sidebar-nav-item ${
+                active ? 'active' : ''
               }`}
             >
               <Icon className="w-4 h-4 shrink-0" />
@@ -140,14 +141,14 @@ export default function AdminDashboard() {
           ))}
         </nav>
 
-        <div className="border-t border-stone-800 p-2 shrink-0">
+        <div className="border-t border-[var(--sidebar-border)] p-2 shrink-0">
           <button
             onClick={() => setCollapsed(c => !c)}
-            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-stone-500 hover:text-stone-300 hover:bg-stone-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-[var(--sidebar-text)] hover:text-[var(--text)] hover:bg-[var(--sidebar-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            <div className="w-6 h-6 rounded-full bg-stone-700 text-white text-[10px] font-bold flex items-center justify-center shrink-0">SA</div>
-            {!collapsed && <span className="truncate text-stone-400">Super Admin</span>}
+            <div className="w-6 h-6 rounded-full bg-[var(--sidebar-hover)] text-[var(--sidebar-text)] text-[10px] font-bold flex items-center justify-center shrink-0">SA</div>
+            {!collapsed && <span className="truncate text-[var(--sidebar-text)]">Super Admin</span>}
           </button>
         </div>
       </aside>
@@ -156,15 +157,15 @@ export default function AdminDashboard() {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
         {/* Topbar */}
-        <header className="h-14 bg-white border-b border-stone-200 flex items-center gap-3 px-5 shrink-0">
-          <div className="flex items-center gap-2 flex-1 max-w-lg bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 focus-within:border-teal-300 focus-within:bg-white transition-colors">
-            <Search className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+        <header className="h-14 app-header flex items-center gap-3 px-5 shrink-0">
+          <div className="flex items-center gap-2 flex-1 max-w-lg bg-[var(--surface)] border border-[var(--border)] rounded-lg px-3 py-2 focus-within:border-teal-300 focus-within:bg-[var(--card-bg)] transition-colors">
+            <Search className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
             <input
               type="search"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search users, institutions, logs…"
-              className="flex-1 bg-transparent text-xs text-stone-700 placeholder-stone-400 outline-none"
+              className="flex-1 bg-transparent text-xs text-[var(--text)] placeholder-[var(--text-muted)] outline-none"
               aria-label="Search platform"
             />
           </div>
@@ -173,14 +174,15 @@ export default function AdminDashboard() {
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               PRODUCTION
             </span>
-            <button className="relative p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 transition-colors" aria-label="Notifications">
+            <ThemeToggle />
+            <button className="relative p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-2)] transition-colors" aria-label="Notifications">
               <Bell className="w-4 h-4" />
               <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full" />
             </button>
-            <button className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 transition-colors" aria-label="Export">
+            <button className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-2)] transition-colors" aria-label="Export">
               <Download className="w-4 h-4" />
             </button>
-            <button className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 transition-colors" aria-label="Refresh">
+            <button className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-2)] transition-colors" aria-label="Refresh">
               <RefreshCw className="w-4 h-4" />
             </button>
           </div>
@@ -196,19 +198,19 @@ export default function AdminDashboard() {
 
           {/* Roles + Subscriptions */}
           <section className="grid grid-cols-1 xl:grid-cols-2 gap-4" aria-label="Roles and subscriptions">
-            <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-sm overflow-hidden">
               <SectionHeader title="Role Distribution" sub="All registered users by access level" />
               <div className="px-5 py-5 space-y-4">
                 {ROLES.map(r => (
                   <div key={r.role}>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-medium text-stone-700">{r.role}</span>
+                      <span className="text-xs font-medium text-[var(--text)]">{r.role}</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-stone-800 tabular-nums">{r.count.toLocaleString()}</span>
-                        <span className="text-[10px] text-stone-400 w-8 text-right tabular-nums">{r.pct}%</span>
+                        <span className="text-xs font-bold text-[var(--text)] tabular-nums">{r.count.toLocaleString()}</span>
+                        <span className="text-[10px] text-[var(--text-muted)] w-8 text-right tabular-nums">{r.pct}%</span>
                       </div>
                     </div>
-                    <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
+                    <div className="h-2 bg-[var(--surface)] rounded-full overflow-hidden">
                       <div className={`h-full rounded-full ${r.color}`} style={{ width: `${r.pct}%` }} />
                     </div>
                   </div>
@@ -216,23 +218,23 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-sm overflow-hidden">
               <SectionHeader title="Subscription Overview" sub="Active plans by tier" action="Manage Billing" />
               <div className="overflow-x-auto">
                 <table className="w-full" aria-label="Subscription plans">
                   <thead>
-                    <tr className="border-b border-stone-100 bg-stone-50/60">
+                    <tr className="border-b border-[var(--border)] bg-[var(--surface)]">
                       {['Plan', 'Institutions', 'ARR', 'Status'].map(h => (
-                        <th key={h} className="text-left px-5 py-2 text-[10px] font-bold text-stone-400 uppercase tracking-wider">{h}</th>
+                        <th key={h} className="text-left px-5 py-2 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-stone-50">
+                  <tbody className="divide-y divide-[var(--border)]">
                     {SUBSCRIPTIONS.map(s => (
-                      <tr key={s.plan} className="hover:bg-stone-50 transition-colors">
-                        <td className="px-5 py-3 text-xs font-semibold text-stone-800">{s.plan}</td>
-                        <td className="px-5 py-3 text-xs text-stone-600 tabular-nums">{s.institutions}</td>
-                        <td className="px-5 py-3 text-xs font-semibold text-stone-800 tabular-nums">{s.arr}</td>
+                      <tr key={s.plan} className="hover:bg-[var(--surface-2)] transition-colors">
+                        <td className="px-5 py-3 text-xs font-semibold text-[var(--text)]">{s.plan}</td>
+                        <td className="px-5 py-3 text-xs text-[var(--text-muted)] tabular-nums">{s.institutions}</td>
+                        <td className="px-5 py-3 text-xs font-semibold text-[var(--text)] tabular-nums">{s.arr}</td>
                         <td className="px-5 py-2.5">
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border capitalize ${PLAN_STATUS[s.status]}`}>{s.status}</span>
                         </td>
@@ -246,32 +248,32 @@ export default function AdminDashboard() {
 
           {/* Moderation + System Health */}
           <section className="grid grid-cols-1 xl:grid-cols-3 gap-4" aria-label="Moderation and system health">
-            <div className="xl:col-span-2 bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="xl:col-span-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-sm overflow-hidden">
               <SectionHeader title="Content Moderation Queue" sub="Unreviewed flags requiring action" action="Open Queue" />
               <div className="overflow-x-auto">
                 <table className="w-full" aria-label="Moderation queue">
                   <thead>
-                    <tr className="border-b border-stone-100 bg-stone-50/60">
+                    <tr className="border-b border-[var(--border)] bg-[var(--surface)]">
                       {['ID', 'Type', 'Course', 'Reporter', 'Time', 'Severity', ''].map(h => (
-                        <th key={h} className="text-left px-4 py-2 text-[10px] font-bold text-stone-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                        <th key={h} className="text-left px-4 py-2 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-stone-50">
+                  <tbody className="divide-y divide-[var(--border)]">
                     {MODERATION.map(m => (
-                      <tr key={m.id} className="hover:bg-stone-50 transition-colors group">
-                        <td className="px-4 py-3 text-[10px] font-mono text-stone-400">{m.id}</td>
-                        <td className="px-4 py-3 text-xs font-semibold text-stone-800 whitespace-nowrap">{m.type}</td>
-                        <td className="px-4 py-3 text-xs text-stone-500 max-w-[140px] truncate">{m.course}</td>
-                        <td className="px-4 py-3 text-xs text-stone-500 whitespace-nowrap">{m.reporter}</td>
-                        <td className="px-4 py-3 text-[10px] text-stone-400 whitespace-nowrap tabular-nums">{m.time}</td>
+                      <tr key={m.id} className="hover:bg-[var(--surface-2)] transition-colors group">
+                        <td className="px-4 py-3 text-[10px] font-mono text-[var(--text-muted)]">{m.id}</td>
+                        <td className="px-4 py-3 text-xs font-semibold text-[var(--text)] whitespace-nowrap">{m.type}</td>
+                        <td className="px-4 py-3 text-xs text-[var(--text-muted)] max-w-[140px] truncate">{m.course}</td>
+                        <td className="px-4 py-3 text-xs text-[var(--text-muted)] whitespace-nowrap">{m.reporter}</td>
+                        <td className="px-4 py-3 text-[10px] text-[var(--text-muted)] whitespace-nowrap tabular-nums">{m.time}</td>
                         <td className="px-4 py-2.5">
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border capitalize ${SEV[m.severity]}`}>{m.severity}</span>
                         </td>
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button className="p-1 rounded text-stone-400 hover:text-teal-700 hover:bg-teal-50 transition-colors" aria-label="Review"><Eye className="w-3 h-3" /></button>
-                            <button className="p-1 rounded text-stone-400 hover:text-red-600 hover:bg-red-50 transition-colors" aria-label="Remove"><Ban className="w-3 h-3" /></button>
+                            <button className="p-1 rounded text-[var(--text-muted)] hover:text-teal-700 hover:bg-teal-50 transition-colors" aria-label="Review"><Eye className="w-3 h-3" /></button>
+                            <button className="p-1 rounded text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 transition-colors" aria-label="Remove"><Ban className="w-3 h-3" /></button>
                           </div>
                         </td>
                       </tr>
@@ -281,27 +283,27 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-sm overflow-hidden flex flex-col">
               <SectionHeader title="System Health" sub="Live service status" />
-              <div className="divide-y divide-stone-50 flex-1">
+              <div className="divide-y divide-[var(--border)] flex-1">
                 {HEALTH.map(s => {
                   const cfg = STATUS_CFG[s.status] ?? STATUS_CFG.operational;
                   return (
-                    <div key={s.label} className="flex items-center gap-3 px-5 py-3.5 hover:bg-stone-50 transition-colors">
+                    <div key={s.label} className="flex items-center gap-3 px-5 py-3.5 hover:bg-[var(--surface-2)] transition-colors">
                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot} ${s.status === 'degraded' ? 'animate-pulse' : ''}`} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-stone-800 truncate">{s.label}</p>
+                        <p className="text-xs font-semibold text-[var(--text)] truncate">{s.label}</p>
                         <p className={`text-[10px] font-medium ${cfg.color}`}>{cfg.label}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-xs font-mono text-stone-600 tabular-nums">{s.latency}</p>
-                        <p className="text-[10px] text-stone-400 tabular-nums">{s.uptime}</p>
+                        <p className="text-xs font-mono text-[var(--text-muted)] tabular-nums">{s.latency}</p>
+                        <p className="text-[10px] text-[var(--text-muted)] tabular-nums">{s.uptime}</p>
                       </div>
                     </div>
                   );
                 })}
               </div>
-              <div className="px-5 py-3 border-t border-stone-100 bg-amber-50/40">
+              <div className="px-5 py-3 border-t border-[var(--border)] bg-amber-50/40">
                 <div className="flex items-center gap-1.5">
                   <AlertTriangle className="w-3 h-3 text-amber-500" />
                   <p className="text-[10px] text-amber-700 font-semibold">Video CDN latency elevated · Investigating</p>
@@ -312,26 +314,26 @@ export default function AdminDashboard() {
 
           {/* Audit Log + Quick Actions */}
           <section className="grid grid-cols-1 xl:grid-cols-3 gap-4" aria-label="Audit log and quick actions">
-            <div className="xl:col-span-2 bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="xl:col-span-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-sm overflow-hidden">
               <SectionHeader title="Audit Trail" sub="Recent privileged actions on the platform" action="Full Logs" />
-              <div className="divide-y divide-stone-50">
+              <div className="divide-y divide-[var(--border)]">
                 {AUDIT.map((a, i) => (
-                  <div key={i} className="flex items-start gap-3 px-5 py-3.5 hover:bg-stone-50 transition-colors">
+                  <div key={i} className="flex items-start gap-3 px-5 py-3.5 hover:bg-[var(--surface-2)] transition-colors">
                     <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${AUDIT_DOT[a.type]}`} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] font-mono font-semibold text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded">{a.actor}</span>
-                        <span className="text-xs text-stone-700 font-medium">{a.action}</span>
+                        <span className="text-[10px] font-mono font-semibold text-[var(--text-muted)] bg-[var(--surface)] px-1.5 py-0.5 rounded">{a.actor}</span>
+                        <span className="text-xs text-[var(--text)] font-medium">{a.action}</span>
                       </div>
-                      <p className="text-[10px] text-stone-400 mt-0.5 truncate">{a.target}</p>
+                      <p className="text-[10px] text-[var(--text-muted)] mt-0.5 truncate">{a.target}</p>
                     </div>
-                    <span className="text-[10px] text-stone-400 shrink-0 tabular-nums whitespace-nowrap">{a.time}</span>
+                    <span className="text-[10px] text-[var(--text-muted)] shrink-0 tabular-nums whitespace-nowrap">{a.time}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-sm overflow-hidden">
               <SectionHeader title="Admin Actions" />
               <div className="p-3 space-y-1.5">
                 {[
@@ -347,17 +349,17 @@ export default function AdminDashboard() {
                   <button
                     key={label}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all text-left group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 ${
-                      teal ? 'border-teal-200 bg-teal-50 hover:bg-teal-100' : 'border-stone-200 hover:bg-stone-50 hover:border-stone-300'
+                      teal ? 'border-teal-200 bg-teal-50 hover:bg-teal-100' : 'border-[var(--border)] hover:bg-[var(--surface-2)] hover:border-[var(--border-2)]'
                     }`}
                   >
-                    <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 transition-colors ${teal ? 'bg-teal-700' : 'bg-stone-100 group-hover:bg-stone-200'}`}>
-                      <Icon className={`w-3.5 h-3.5 ${teal ? 'text-white' : 'text-stone-500'}`} />
+                    <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 transition-colors ${teal ? 'bg-teal-700' : 'bg-[var(--surface)] group-hover:bg-[var(--surface-2)]'}`}>
+                      <Icon className={`w-3.5 h-3.5 ${teal ? 'text-white' : 'text-[var(--text-muted)]'}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-xs font-semibold truncate ${teal ? 'text-teal-900' : 'text-stone-700'}`}>{label}</p>
-                      <p className={`text-[10px] truncate ${teal ? 'text-teal-700' : 'text-stone-400'}`}>{desc}</p>
+                      <p className={`text-xs font-semibold truncate ${teal ? 'text-teal-900' : 'text-[var(--text)]'}`}>{label}</p>
+                      <p className={`text-[10px] truncate ${teal ? 'text-teal-700' : 'text-[var(--text-muted)]'}`}>{desc}</p>
                     </div>
-                    <ChevronRight className="w-3 h-3 text-stone-300 group-hover:text-stone-500 shrink-0 transition-colors" />
+                    <ChevronRight className={`w-3 h-3 shrink-0 transition-colors ${teal ? 'text-teal-300 group-hover:text-teal-500' : 'text-[var(--text-muted)] group-hover:text-[var(--text)]'}`} />
                   </button>
                 ))}
               </div>
