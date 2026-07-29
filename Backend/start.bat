@@ -1,58 +1,48 @@
 @echo off
-REM Quick start script for A-Quire Backend (Windows)
+REM ─────────────────────────────────────────────────────────────
+REM  A-Quire Backend — Windows Dev Startup Script
+REM  Usage: start.bat
+REM ─────────────────────────────────────────────────────────────
+setlocal
 
-setlocal enabledelayedexpansion
+echo [A-Quire] Starting local development server...
 
-echo 🚀 A-Quire Backend Quick Start
-echo ==============================
-
-REM Check if Docker is installed
-docker --version >nul 2>&1
+REM Check Python
+python --version >nul 2>&1
 if errorlevel 1 (
-    echo ❌ Docker is not installed. Please install Docker Desktop first.
+    echo [ERROR] Python not found. Install Python 3.11+ first.
     exit /b 1
 )
 
-echo ✅ Docker found
-
-REM Check if .env exists
+REM Check .env exists
 if not exist ".env" (
-    echo 📝 Creating .env from .env.example
-    copy .env.example .env
-    echo ⚠️  Update .env with your settings before deploying to production
+    echo [ERROR] .env file not found. Copy .env.example to .env and configure it.
+    exit /b 1
 )
 
-REM Start services
-echo 🐳 Starting Docker Compose services...
-docker-compose up -d
+REM Install dependencies if needed
+if not exist "venv\" (
+    echo [INFO] Creating virtual environment...
+    python -m venv venv
+)
 
-REM Wait for PostgreSQL
-echo ⏳ Waiting for PostgreSQL to be ready...
-timeout /t 5 /nobreak
+call venv\Scripts\activate.bat
+
+echo [INFO] Installing dependencies...
+pip install -r requirements.txt --quiet
 
 REM Run migrations
-echo 🔄 Running database migrations...
-docker-compose exec -T backend alembic upgrade head
+echo [INFO] Running database migrations...
+alembic upgrade head
+if errorlevel 1 (
+    echo [ERROR] Migration failed. Is PostgreSQL running?
+    exit /b 1
+)
 
-REM Health check
-echo 🏥 Running health check...
-timeout /t 2 /nobreak
+REM Start server
+echo [OK] Starting FastAPI on http://localhost:8000
+echo [OK] API docs at http://localhost:8000/docs
+echo.
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-echo.
-echo ✅ Backend is ready!
-echo.
-echo 📊 Access Points:
-echo   - API Docs:      http://localhost:8000/docs
-echo   - ReDoc:         http://localhost:8000/redoc
-echo   - Health:        http://localhost:8000/health
-echo.
-echo 📝 Next Steps:
-echo   1. Register a user: POST /api/v1/auth/register
-echo   2. Login: POST /api/v1/auth/login
-echo   3. Create courses: POST /api/v1/courses/
-echo.
-echo 📋 Common Commands:
-echo   - View logs:      docker-compose logs -f backend
-echo   - Stop services:  docker-compose down
-echo   - Run tests:      docker-compose exec backend pytest tests/ -v
-echo.
+endlocal

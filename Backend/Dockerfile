@@ -1,21 +1,26 @@
 FROM python:3.11-slim
 
-WORKDIR /app
-
-# System deps needed to compile asyncpg / passlib
+# ── System deps ───────────────────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python deps in a separate layer (better cache reuse)
+# ── Working directory ─────────────────────────────────────────────────────
+WORKDIR /app
+
+# ── Python deps (cached layer) ────────────────────────────────────────────
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application source
+# ── Application code ──────────────────────────────────────────────────────
 COPY . .
 
+# ── Non-root user for security ────────────────────────────────────────────
+RUN addgroup --system aquire && adduser --system --ingroup aquire aquire
+USER aquire
+
+# ── Runtime ───────────────────────────────────────────────────────────────
 EXPOSE 8000
 
-# Production: 2 workers, no reload
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
