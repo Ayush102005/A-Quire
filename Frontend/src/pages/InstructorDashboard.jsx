@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, BookOpen, BarChart2, Settings,
   Bell, ChevronRight, AlertTriangle, TrendingUp, Brain,
@@ -7,16 +7,29 @@ import {
   Lightbulb, FileText, Zap, ArrowUpRight, ArrowDownRight,
   Plus, Trash2, Edit3, Eye, EyeOff, X, Loader2, ChevronDown,
   ChevronUp, Play, Link as LinkIcon, GraduationCap, Save, Menu, Mail,
+  HelpCircle, Check,
 } from 'lucide-react';
-import { api } from '../services/api';
-import { dsaProblems } from './dsaProblems';
+import { api, getCurrentUser } from '../services/api';
 import ThemeToggle from '../components/ThemeToggle';
+import { LoadingState, EmptyState } from '../components/UXStates';
+import InstructorSidebar from '../components/InstructorSidebar';
+import { getStruggleReasonText } from '../components/lesson/InterventionOverlay';
+
+function timeAgo(dateStr) {
+  if (!dateStr) return "";
+  const diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
 
 // ── Static mock data (overview tab) removed for production ───────────
 
 // ── Small shared components ───────────────────────────────────────────────────
-function Sparkline({ values }) {
-  const max = Math.max(...values), min = Math.min(...values);
+function Sparkline({ values, minVal, maxVal }) {
+  const max = maxVal !== undefined ? maxVal : Math.max(...values);
+  const min = minVal !== undefined ? minVal : Math.min(...values);
   const h = 48, w = 200;
   const pts = values.map((v, i) => {
     const x = (i / (values.length - 1)) * w;
@@ -123,6 +136,11 @@ function CourseCard({ course, onEdit, onTogglePublish, onDelete, onExpand, expan
 // ── Module list (inside expanded course card) ─────────────────────────────────
 function ModuleList({ course }) {
   const [modules, setModules] = useState(course.modules || []);
+  
+  useEffect(() => {
+    setModules(course.modules || []);
+  }, [course.modules]);
+
   const [showAddModule, setShowAddModule] = useState(false);
   const [moduleTitle, setModuleTitle] = useState('');
   const [saving, setSaving] = useState(false);
@@ -162,7 +180,10 @@ function ModuleList({ course }) {
   return (
     <div className="border-t border-[var(--border)] bg-[var(--surface)] px-5 py-4 space-y-3">
       {modules.length === 0 && !showAddModule && (
-        <p className="text-xs text-[var(--text-faint)] text-center py-2">No modules yet — add one below.</p>
+        <EmptyState 
+          title="No modules yet" 
+          message="Add a module to start organizing your lessons." 
+        />
       )}
       {modules.map(mod => (
         <div key={mod.id} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg overflow-hidden">
@@ -183,7 +204,7 @@ function ModuleList({ course }) {
               {expandedModule === mod.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             </button>
           </div>
-          {expandedModule === mod.id && <LessonList module={mod} />}
+          {expandedModule === mod.id && <LessonList module={mod} course={course} />}
         </div>
       ))}
 
@@ -224,9 +245,15 @@ function ModuleList({ course }) {
 }
 
 // ── Lesson list (inside expanded module) ──────────────────────────────────────
-function LessonList({ module }) {
+function LessonList({ module, course }) {
   const [lessons, setLessons] = useState(module.lessons || []);
+
+  useEffect(() => {
+    setLessons(module.lessons || []);
+  }, [module.lessons]);
+
   const [showForm, setShowForm] = useState(false);
+  const [quizLessonId, setQuizLessonId] = useState(null);
   const [lessonType, setLessonType] = useState('video'); // 'dsa' or 'video'
   const [form, setForm] = useState({
     title: '',
@@ -244,6 +271,7 @@ function LessonList({ module }) {
     complexity_time: '',
     complexity_space: '',
     external_links: '',
+    auto_fetch_transcript: true,
   });
   const [saving, setSaving] = useState(false);
 
@@ -286,7 +314,18 @@ function LessonList({ module }) {
         lessonType,
         lessonType === 'dsa' ? lessonPayload : null
       );
-      setLessons(prev => [...prev, lesson]);
+      
+      let finalLesson = lesson;
+      if (lessonType === 'video' && form.video_url.trim() && form.auto_fetch_transcript) {
+        try {
+          finalLesson = await api.instructor.fetchTranscript(lesson.id);
+        } catch (fetchErr) {
+          console.error("Failed to auto-fetch transcript:", fetchErr);
+          // Don't alert here so we still complete the creation flow successfully
+        }
+      }
+      
+      setLessons(prev => [...prev, finalLesson]);
       resetForm();
       setShowForm(false);
     } catch (err) {
@@ -312,6 +351,7 @@ function LessonList({ module }) {
       complexity_time: '',
       complexity_space: '',
       external_links: '',
+      auto_fetch_transcript: true,
     });
   }
 
@@ -325,27 +365,60 @@ function LessonList({ module }) {
     }
   }
 
+  async function handleFetchTranscript(lessonId) {
+    try {
+      setSaving(true);
+      const updated = await api.instructor.fetchTranscript(lessonId);
+      setLessons(prev => prev.map(l => l.id === lessonId ? updated : l));
+      alert('Transcript fetched successfully.');
+    } catch (err) {
+      alert('Failed to fetch transcript: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <div className="border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3 space-y-2">
+    <div className="border-t border-[var(--border)] bg-[var(--surface-2)] px-5 py-4 pl-12 space-y-2">
       {lessons.length === 0 && !showForm && (
-        <p className="text-[10px] text-[var(--text-faint)] text-center py-1">No lessons yet.</p>
+        <EmptyState 
+          title="No lessons" 
+          message="This module is empty. Add a video or DSA problem." 
+        />
       )}
       {lessons.map((l, i) => (
-        <div key={l.id} className="flex items-center gap-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-lg px-3 py-2">
-          <span className="text-[10px] text-[var(--text-faint)] font-mono w-4 shrink-0">{i + 1}</span>
-          <Play className="w-3 h-3 text-teal-500 shrink-0" />
-          <span className="flex-1 text-xs font-medium text-[var(--text)] truncate">{l.title}</span>
-          <span className="text-[9px] px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 font-semibold">
-            {l.lesson_type === 'dsa' ? 'DSA' : 'Video'}
-          </span>
-          {l.video_url && (
-            <a href={l.video_url} target="_blank" rel="noopener noreferrer" className="text-[var(--text-muted)] hover:text-teal-600 transition-colors">
-              <LinkIcon className="w-3 h-3" />
-            </a>
+        <div key={l.id}>
+          <div className="flex items-center gap-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-lg px-3 py-2">
+            <span className="text-[10px] text-[var(--text-faint)] font-mono w-4 shrink-0">{i + 1}</span>
+            <Play className="w-3 h-3 text-teal-500 shrink-0" />
+            <span className="flex-1 text-xs font-medium text-[var(--text)] truncate">{l.title}</span>
+            <span className="text-[9px] px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 font-semibold">
+              {l.lesson_type === 'dsa' ? 'DSA' : 'Video'}
+            </span>
+            {l.video_url && (
+              <>
+                <button title="Fetch Transcript" onClick={() => handleFetchTranscript(l.id)} className="text-[var(--text-muted)] hover:text-teal-600 transition-colors">
+                  <FileText className="w-3 h-3" />
+                </button>
+                <a href={l.video_url} target="_blank" rel="noopener noreferrer" className="text-[var(--text-muted)] hover:text-teal-600 transition-colors">
+                  <LinkIcon className="w-3 h-3" />
+                </a>
+              </>
+            )}
+            <button
+              title="Add quiz questions for this lesson's chapter"
+              onClick={() => setQuizLessonId(prev => prev === l.id ? null : l.id)}
+              className={`transition-colors ${quizLessonId === l.id ? 'text-teal-600' : 'text-[var(--text-muted)] hover:text-teal-600'}`}
+            >
+              <HelpCircle className="w-3 h-3" />
+            </button>
+            <button onClick={() => handleDelete(l.id)} className="text-[var(--text-muted)] hover:text-red-500 transition-colors">
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
+          {quizLessonId === l.id && (
+            <LessonQuizPanel module={module} course={course} onClose={() => setQuizLessonId(null)} />
           )}
-          <button onClick={() => handleDelete(l.id)} className="text-[var(--text-muted)] hover:text-red-500 transition-colors">
-            <Trash2 className="w-3 h-3" />
-          </button>
         </div>
       ))}
 
@@ -402,6 +475,16 @@ function LessonList({ module }) {
                 className={inputCls + ' text-xs py-2'}
                 disabled={saving}
               />
+              <label className="flex items-center gap-2 cursor-pointer mt-1 mb-1">
+                <input
+                  type="checkbox"
+                  checked={form.auto_fetch_transcript}
+                  onChange={e => setForm(f => ({ ...f, auto_fetch_transcript: e.target.checked }))}
+                  disabled={saving}
+                  className="rounded border-[var(--border)] text-teal-600 focus:ring-teal-500"
+                />
+                <span className="text-xs text-[var(--text-muted)]">Auto-fetch YouTube transcript</span>
+              </label>
               <textarea
                 value={form.description}
                 onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
@@ -555,6 +638,129 @@ function LessonList({ module }) {
   );
 }
 
+// ── Lesson quiz panel — authors an MCQ question tied to this lesson's chapter ──
+// Questions are attached by TOPIC, not lesson_id directly (see app/models/
+// assessment.py) — matching the module's title as the topic name means these
+// questions surface in the "Chapter Quiz" launched from CourseDetail.jsx,
+// which resolves its Topic the same way (see start_quiz_session in
+// assessments.py). Manually-authored questions here sit in the same pool the
+// adaptive engine draws from and can fall back to AI generation for —
+// they're not a separate, disconnected quiz system.
+const OPTION_KEYS = ['A', 'B', 'C', 'D'];
+
+function LessonQuizPanel({ module, course, onClose }) {
+  const [content, setContent] = useState('');
+  const [options, setOptions] = useState({ A: '', B: '', C: '', D: '' });
+  const [correctAnswer, setCorrectAnswer] = useState('A');
+  const [difficulty, setDifficulty] = useState('Medium');
+  const [saving, setSaving] = useState(false);
+  const [addedCount, setAddedCount] = useState(0);
+
+  const canSave = content.trim() && OPTION_KEYS.every(k => options[k].trim());
+
+  async function handleAdd(e) {
+    e.preventDefault();
+    if (!canSave) return;
+    setSaving(true);
+    try {
+      await api.questions.create({
+        exam: course?.exam_category || 'Other',
+        subject: course?.title || module.title,
+        topic: module.title,
+        difficulty,
+        type: 'mcq',
+        tags: [],
+        content: content.trim(),
+        options: OPTION_KEYS.map(k => ({ id: k, text: options[k].trim() })),
+        correct_answer: correctAnswer,
+        explanation: '',
+      });
+      setAddedCount(c => c + 1);
+      setContent('');
+      setOptions({ A: '', B: '', C: '', D: '' });
+      setCorrectAnswer('A');
+    } catch (err) {
+      alert('Failed to add quiz question: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleAdd} className="mt-1.5 mb-2 space-y-2.5 bg-[var(--card-bg)] border border-teal-200 rounded-lg p-3">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-semibold text-teal-700 uppercase tracking-wider">
+          Quiz question — {module.title}
+        </p>
+        <button type="button" onClick={onClose} className="text-[var(--text-faint)] hover:text-[var(--text)] transition-colors">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {addedCount > 0 && (
+        <p className="flex items-center gap-1 text-[10px] font-medium text-teal-700">
+          <Check className="w-3 h-3" /> {addedCount} question{addedCount === 1 ? '' : 's'} added this session
+        </p>
+      )}
+
+      <textarea
+        value={content}
+        onChange={e => setContent(e.target.value)}
+        placeholder="Question text*"
+        rows={2}
+        className={textareaCls + ' text-xs py-2'}
+        disabled={saving}
+      />
+
+      <div className="space-y-1.5">
+        {OPTION_KEYS.map(k => (
+          <label key={k} className="flex items-center gap-2">
+            <input
+              type="radio"
+              name={`correct-${module.id}`}
+              checked={correctAnswer === k}
+              onChange={() => setCorrectAnswer(k)}
+              disabled={saving}
+              title="Mark as correct answer"
+            />
+            <span className="text-[10px] font-mono text-[var(--text-faint)] w-3 shrink-0">{k}</span>
+            <input
+              type="text"
+              value={options[k]}
+              onChange={e => setOptions(o => ({ ...o, [k]: e.target.value }))}
+              placeholder={`Option ${k}*`}
+              className={inputCls + ' text-xs py-1.5 flex-1'}
+              disabled={saving}
+            />
+          </label>
+        ))}
+      </div>
+      <p className="text-[9px] text-[var(--text-faint)]">Select the radio button next to the correct option.</p>
+
+      <div className="flex items-center gap-2">
+        <select
+          value={difficulty}
+          onChange={e => setDifficulty(e.target.value)}
+          className={inputCls + ' text-xs py-1.5 w-28'}
+          disabled={saving}
+        >
+          <option value="Easy">Easy</option>
+          <option value="Medium">Medium</option>
+          <option value="Hard">Hard</option>
+        </select>
+        <button
+          type="submit"
+          disabled={saving || !canSave}
+          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-teal-700 text-white text-xs font-semibold disabled:opacity-50 hover:bg-teal-800 transition-colors"
+        >
+          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+          Add Question
+        </button>
+      </div>
+    </form>
+  );
+}
+
 // ── Courses Tab ───────────────────────────────────────────────────────────────
 function CoursesTab() {
   const [courses, setCourses] = useState([]);
@@ -673,11 +879,7 @@ function CoursesTab() {
       </div>
 
       {/* States */}
-      {loading && (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
-        </div>
-      )}
+      {loading && <LoadingState message="Loading courses..." />}
       {!loading && error && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4 text-sm text-red-700">
           {error}
@@ -685,21 +887,18 @@ function CoursesTab() {
         </div>
       )}
       {!loading && !error && courses.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-[var(--surface-2)] flex items-center justify-center">
-            <BookOpen className="w-7 h-7 text-[var(--text-faint)]" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-[var(--text)]">No courses yet</p>
-            <p className="text-xs text-[var(--text-faint)] mt-1">Create your first course to get started.</p>
-          </div>
-          <button
-            onClick={() => { setForm({ title: '', description: '', exam_category: 'Other' }); setShowCreateModal(true); }}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-teal-700 text-white rounded-xl hover:bg-teal-800 transition-colors"
-          >
-            <Plus className="w-4 h-4" /> Create Course
-          </button>
-        </div>
+        <EmptyState 
+          title="No courses yet"
+          message="Create your first course to get started."
+          action={
+            <button
+              onClick={() => { setForm({ title: '', description: '', exam_category: 'Other' }); setShowCreateModal(true); }}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-teal-700 text-white rounded-xl hover:bg-teal-800 transition-colors"
+            >
+              <Plus className="w-4 h-4" /> Create Course
+            </button>
+          }
+        />
       )}
       {!loading && !error && courses.map(course => (
         <CourseCard
@@ -831,32 +1030,106 @@ function CoursesTab() {
   );
 }
 
+// ── Lesson Timeline Modal ─────────────────────────────────────────────────────
+function LessonTimelineModal({ lessonId, lessonName, onClose }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    api.instructor.getLessonTimeline(lessonId)
+      .then(res => { if (!cancelled) setData(res); })
+      .catch(err => { if (!cancelled) setError(err.message || 'Failed to load timeline.'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [lessonId]);
+
+  return (
+    <Modal title={`Struggle Timeline: ${lessonName}`} onClose={onClose}>
+      <div className="space-y-4">
+        {loading && <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-teal-600" /></div>}
+        {!loading && error && <p className="text-sm text-red-500">{error}</p>}
+        {!loading && !error && data && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center bg-[var(--surface)] p-3 rounded-lg border border-[var(--border)]">
+              <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">Total Struggles</span>
+              <span className="text-sm font-bold text-[var(--text)]">{data.total_struggles}</span>
+            </div>
+            
+            {data.timeline.length === 0 ? (
+              <p className="text-xs text-[var(--text-muted)] py-4 text-center">No struggle events recorded for this lesson yet.</p>
+            ) : (
+              <div className="pt-2">
+                <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">Struggles over video duration</p>
+                <div className="relative h-32 flex items-end gap-1 pb-6">
+                  {data.timeline.map((bucket, i) => {
+                    const maxCount = Math.max(...data.timeline.map(b => b.count));
+                    const heightPct = Math.max(5, (bucket.count / maxCount) * 100);
+                    const mins = Math.floor(bucket.timestamp_s / 60);
+                    const secs = bucket.timestamp_s % 60;
+                    const timeLabel = `${mins}:${secs.toString().padStart(2, '0')}`;
+                    return (
+                      <div key={bucket.timestamp_s} className="flex-1 flex flex-col items-center group relative h-full justify-end">
+                        <div 
+                          className="w-full bg-teal-500 hover:bg-teal-600 rounded-t-sm transition-all" 
+                          style={{ height: `${heightPct}%` }}
+                        />
+                        <span className="absolute -bottom-5 text-[8px] text-[var(--text-faint)] font-mono opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                          {timeLabel}
+                        </span>
+                        {/* Tooltip */}
+                        <div className="absolute -top-7 bg-black/80 text-white text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                          {timeLabel} - {bucket.count} struggle{bucket.count !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 // ── Overview Tab (original content) ──────────────────────────────────────────
 function OverviewTab({ setActiveTab }) {
+  const navigate = useNavigate();
   const [summary, setSummary] = useState(null);
   const [lessons, setLessons] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [timelineLesson, setTimelineLesson] = useState(null);
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const [sum, less, stud] = await Promise.all([
-          api.instructor.getSummary(),
-          api.instructor.getLessons(),
-          api.instructor.getStudents(),
-        ]);
-        setSummary(sum);
-        setLessons(less || []);
-        setStudents(stud || []);
-      } catch (err) {
-        console.error("Failed to load overview data", err);
-      } finally {
-        setLoading(false);
-      }
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [sum, less, stud] = await Promise.all([
+        api.instructor.getSummary(),
+        api.instructor.getLessons(),
+        api.instructor.getStudents(),
+      ]);
+      setSummary(sum);
+      setLessons(less || []);
+      setStudents(stud || []);
+    } catch (err) {
+      // Previously silently swallowed here — a failed request rendered
+      // identically to "genuinely no data yet" with no way to tell the two
+      // apart from the UI. Surface it instead.
+      console.error("Failed to load overview data", err);
+      setError(err.message || 'Failed to load overview data.');
+    } finally {
+      setLoading(false);
     }
-    load();
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   const metrics = summary ? [
     { label: 'Total Struggles', value: summary.total_struggles, delta: '--', up: true, sub: 'Platform-wide' },
@@ -866,12 +1139,37 @@ function OverviewTab({ setActiveTab }) {
   ] : [];
 
   const hotspots = lessons.slice(0, 5).map(l => ({
-     lesson: l.name, module: 'Course', struggles: l.struggles, rate: l.struggles > 0 ? 50 : 0
+     id: l.id, lesson: l.name, module: l.module, struggles: l.struggles, rate: l.rate
   }));
 
   const stList = students.slice(0, 5).map((s, i) => ({
      id: s.id || i, name: s.name, avatar: s.name[0], lastActive: 'recently', lesson: 'active', struggles: s.struggles, status: s.risk
   }));
+
+  // Derived from the real 12-week engagement_trend array — there is no
+  // separate "engagement_stats" from the backend (there was previously a
+  // hardcoded 80%/74%/65% fallback here that always won, since that field
+  // never actually existed on any response).
+  const engagementTrend = summary?.engagement_trend || [];
+  const engagementStats = engagementTrend.length
+    ? {
+        peak: `${Math.round(Math.max(...engagementTrend))}%`,
+        current: `${Math.round(engagementTrend[engagementTrend.length - 1])}%`,
+        // Was `engagementTrend.reduce(...) / engagementTrend.length` here —
+        // dividing by all 12 weekly buckets unconditionally, including any
+        // with zero recorded activity. Once a week's data collapses to a
+        // single bucket average, "0.0" is indistinguishable between "no
+        // one did anything this week" and "students genuinely engaged at
+        // 0%" — so one real 100% week diluted across 11 silent ones read
+        // as "8% avg", which looks like almost no one is engaged rather
+        // than the true story. engagement_trend_avg is computed
+        // server-side (see get_instructor_summary()) from the same raw
+        // weekly buckets, but only over the weeks that actually had data.
+        avg: summary?.engagement_trend_avg != null
+          ? `${Math.round(summary.engagement_trend_avg)}%`
+          : '--',
+      }
+    : { peak: '--', current: '--', avg: '--' };
 
   const STATUS_BADGE = {
     high: 'bg-red-50 text-red-700 border-red-100',
@@ -879,10 +1177,51 @@ function OverviewTab({ setActiveTab }) {
     low: 'bg-[var(--surface)] text-[var(--text-muted)] border-[var(--border)]',
   };
 
-  if (loading) return <div className="p-10 text-center text-[var(--text-faint)]">Loading overview...</div>;
+  // Builds a CSV from whatever this page already has loaded (no extra
+  // request — the same summary/lessons/students already rendered above)
+  // and triggers a real browser download. "Export Class Report" previously
+  // had no handler at all, so clicking it did nothing.
+  function handleExportReport() {
+    const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows = [
+      ['A-Quire Class Overview Report'],
+      ['Generated', new Date().toLocaleString()],
+      [],
+      ['Metric', 'Value'],
+      ['Total Struggles', summary?.total_struggles ?? ''],
+      ['AI Interventions', summary?.interventions ?? ''],
+      ['Resolution Rate (%)', summary?.resolution_rate_pct ?? ''],
+      ['At-Risk Students', summary?.at_risk_students ?? ''],
+      [],
+      ['Lesson', 'Module', 'Students Struggled', 'Struggle Rate (%)'],
+      ...lessons.map(l => [l.name, l.module, l.struggles, l.rate]),
+      [],
+      ['Student', 'Struggles', 'Risk Level'],
+      ...students.map(s => [s.name, s.struggles, s.risk]),
+    ];
+    const csv = rows.map(row => row.map(csvCell).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `class-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  if (loading) return <LoadingState message="Loading overview..." />;
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4 text-sm text-red-700">
+          {error}
+          <button onClick={load} className="ml-3 text-xs font-semibold underline">Retry</button>
+        </div>
+      )}
+
       <section aria-label="Key metrics" className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {metrics.map(m => <MetricCard key={m.label} {...m} />)}
       </section>
@@ -896,7 +1235,10 @@ function OverviewTab({ setActiveTab }) {
               </h2>
               <p className="text-xs text-[var(--text-faint)] mt-0.5">Ranked by % of students who triggered an AI intervention</p>
             </div>
-            <button className="text-xs font-semibold text-teal-700 hover:underline flex items-center gap-1">
+            <button
+              onClick={() => navigate('/analytics')}
+              className="text-xs font-semibold text-teal-700 hover:underline flex items-center gap-1"
+            >
               View all <ChevronRight className="w-3 h-3" />
             </button>
           </div>
@@ -904,7 +1246,7 @@ function OverviewTab({ setActiveTab }) {
             <table className="w-full text-sm" aria-label="Struggle hotspots">
               <thead>
                 <tr className="border-b border-[var(--border)] bg-[var(--surface)]">
-                  {['Lesson', 'Module', 'Students', 'Struggle Rate'].map(h => (
+                  {['Lesson', 'Module', 'Students', 'Struggle Rate', ''].map(h => (
                     <th key={h} className="text-left px-5 py-2.5 text-[10px] font-bold text-[var(--text-faint)] uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
@@ -928,12 +1270,28 @@ function OverviewTab({ setActiveTab }) {
                         <span className={`text-xs font-bold tabular-nums ${row.rate > 60 ? 'text-red-600' : row.rate > 40 ? 'text-amber-600' : 'text-[var(--text-muted)]'}`}>{row.rate}%</span>
                       </div>
                     </td>
+                    <td className="px-5 py-3 text-right">
+                      <button 
+                        onClick={() => setTimelineLesson(row)}
+                        className="text-xs font-semibold text-teal-600 hover:text-teal-800 hover:underline flex items-center gap-1 justify-end ml-auto"
+                      >
+                        <BarChart2 className="w-3.5 h-3.5" /> Timeline
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </div>
+
+        {timelineLesson && (
+          <LessonTimelineModal 
+            lessonId={timelineLesson.id} 
+            lessonName={timelineLesson.lesson} 
+            onClose={() => setTimelineLesson(null)} 
+          />
+        )}
 
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-[var(--border)]">
@@ -972,13 +1330,27 @@ function OverviewTab({ setActiveTab }) {
             <h2 className="text-sm font-semibold text-[var(--text)] flex items-center gap-2">
               <Users className="w-4 h-4 text-[var(--text-muted)]" /> Students Needing Support
             </h2>
-            <button className="text-xs font-semibold text-teal-700 hover:underline flex items-center gap-1">
+            <button
+              onClick={() => setActiveTab && setActiveTab('students')}
+              className="text-xs font-semibold text-teal-700 hover:underline flex items-center gap-1"
+            >
               All students <ChevronRight className="w-3 h-3" />
             </button>
           </div>
           <div className="divide-y divide-[var(--border)]">
             {stList.map(s => (
-              <div key={s.id} className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--surface)] transition-colors">
+              // Was a plain, unclickable div — this list is the first
+              // thing an instructor sees for "who needs help," and
+              // clicking a name did nothing at all. The Students tab (with
+              // the full per-student drawer — courses, progress, struggle
+              // history) is the real destination; this page doesn't carry
+              // per-student drawer state of its own to jump straight to
+              // one student's detail.
+              <button
+                key={s.id}
+                onClick={() => setActiveTab && setActiveTab('students')}
+                className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[var(--surface)] transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-inset"
+              >
                 <div className="w-8 h-8 rounded-full bg-[var(--surface)] text-[var(--text-muted)] text-xs font-bold flex items-center justify-center shrink-0">{s.avatar}</div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[var(--text)] truncate">{s.name}</p>
@@ -988,7 +1360,7 @@ function OverviewTab({ setActiveTab }) {
                   <span className="text-xs font-semibold text-[var(--text-muted)] tabular-nums">{s.struggles} struggles</span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_BADGE[s.status]}`}>{s.status}</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -1011,19 +1383,28 @@ function OverviewTab({ setActiveTab }) {
                   <div className="h-px bg-[var(--border)] w-full" />
                   <div className="h-px bg-[var(--border)] w-full" />
                 </div>
-                <Sparkline values={summary?.engagement_trend || [42, 55, 48, 67, 59, 72, 68, 74, 71, 80, 74, 78]} />
+                <Sparkline values={engagementTrend.length ? engagementTrend : Array(12).fill(0)} minVal={0} maxVal={100} />
               </div>
             </div>
             <div className="flex justify-between mt-1 pl-8">
-              {['W1','W3','W5','W7','W9','W11'].map(w => (
+              {/* Was a hardcoded ['W1','W3','W5','W7','W9','W11'] — with 6
+                  labels spread edge-to-edge (justify-between) across a
+                  12-point chart, the *last* label naturally lands at the
+                  12th/rightmost column (the current week — where the real
+                  data actually is), but it was still labeled "W11", off by
+                  one from where it visually sits, and the true 12th week
+                  had no label of its own at all. "Now" for the current
+                  week removes the ambiguity entirely instead of requiring
+                  the reader to count columns against an index. */}
+              {['11w ago','9w ago','7w ago','5w ago','3w ago','Now'].map(w => (
                 <span key={w} className="text-[9px] text-[var(--text-faint)] font-mono">{w}</span>
               ))}
             </div>
             <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-[var(--border)]">
               {[
-                ['Peak', summary?.engagement_stats?.peak || '80%', 'text-teal-700'], 
-                ['Current', summary?.engagement_stats?.current || '74%', 'text-[var(--text)]'], 
-                ['Avg', summary?.engagement_stats?.avg || '65%', 'text-[var(--text-muted)]']
+                ['Peak', engagementStats.peak, 'text-teal-700'],
+                ['Current', engagementStats.current, 'text-[var(--text)]'],
+                ['Avg', engagementStats.avg, 'text-[var(--text-muted)]']
               ].map(([l, v, c]) => (
                 <div key={l} className="text-center">
                   <p className={`text-base font-bold tabular-nums ${c}`}>{v}</p>
@@ -1067,15 +1448,42 @@ function OverviewTab({ setActiveTab }) {
           </div>
           <div className="p-4 space-y-2 flex-1">
             {[
-              { icon: FileText, label: 'Export Class Report', desc: 'PDF · last 30 days' },
-              { icon: AlertTriangle, label: 'Review Struggling Students', desc: '5 students flagged', tab: 'students' },
+              // Was a purely decorative entry — no href, no tab, no
+              // onClick of its own, so the generic dispatch below did
+              // nothing at all when clicked. `action: 'export'` now routes
+              // to a real handler (see handleExportReport below) that
+              // downloads a CSV built from this page's already-loaded
+              // summary/lessons/students data. Labeled "PDF" before, which
+              // it never was and still isn't — a real PDF export would be
+              // a separate, larger feature (server-side rendering); CSV is
+              // what's actually deliverable from data already on this page.
+              { icon: FileText, label: 'Export Class Report', desc: 'CSV · current data', action: 'export' },
+              {
+                icon: AlertTriangle, label: 'Review Struggling Students',
+                // Was hardcoded to "5 students flagged" regardless of
+                // reality — this lesson's actual at-risk count, from the
+                // same summary the metric card above already displays.
+                desc: `${summary?.at_risk_students ?? 0} student${summary?.at_risk_students === 1 ? '' : 's'} flagged`,
+                tab: 'students',
+              },
               { icon: BookOpen, label: 'Update Course Content', desc: 'Manage in Courses tab', tab: 'courses' },
-              { icon: Brain, label: 'Tune AI Sensitivity', desc: 'Intervention threshold', tab: 'settings' },
-              { icon: BarChart2, label: 'View Full Analytics', desc: 'All metrics & charts', tab: 'analytics' },
-            ].map(({ icon: Icon, label, desc, tab }) => (
+              { icon: Brain, label: 'Tune AI Sensitivity', desc: 'Intervention threshold', href: '/settings' },
+              { icon: BarChart2, label: 'View Full Analytics', desc: 'All metrics & charts', href: '/analytics' },
+            ].map(({ icon: Icon, label, desc, tab, href, action }) => (
               <button
                 key={label}
-                onClick={() => tab && setActiveTab && setActiveTab(tab)}
+                // 'settings' and 'analytics' are real pages (see
+                // InstructorSidebar.jsx), not tabs rendered by this
+                // component (only overview/courses/students are) — routing
+                // them through setActiveTab(tab) silently landed back on
+                // Overview because the tab whitelist below only recognizes
+                // those three. Route them with navigate() instead, same as
+                // the sidebar does.
+                onClick={() => {
+                  if (action === 'export') return handleExportReport();
+                  if (href) return navigate(href);
+                  if (tab && setActiveTab) return setActiveTab(tab);
+                }}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[var(--border)] hover:border-[var(--border)] hover:bg-[var(--surface)] transition-all text-left group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
               >
                 <div className="w-7 h-7 rounded-lg bg-[var(--surface)] group-hover:bg-teal-50 flex items-center justify-center shrink-0 transition-colors">
@@ -1094,15 +1502,6 @@ function OverviewTab({ setActiveTab }) {
     </div>
   );
 }
-
-// ── Nav items ─────────────────────────────────────────────────────────────────
-const NAV = [
-  { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
-  { id: 'courses',  icon: BookOpen,        label: 'Courses'  },
-  { id: 'students', icon: Users,           label: 'Students' },
-  { id: 'analytics',icon: BarChart2,       label: 'Analytics'},
-  { id: 'settings', icon: Settings,        label: 'Settings' },
-];
 
 // ── Operation Modal ────────────────────────────────────────────────────────────
 // ── Operation Modal ────────────────────────────────────────────────────────────
@@ -1128,21 +1527,7 @@ function OperationModal({ isOpen, onClose, type, student }) {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/analytics/instructor/students/${student.id}/operation`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        },
-        body: JSON.stringify({
-          operation_type: type,
-          content: contentVal
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('API request failed');
-      }
+      await api.analytics.performStudentOperation(student.id, type, contentVal);
 
       setSuccess(true);
       setTimeout(() => {
@@ -1209,8 +1594,46 @@ function OperationModal({ isOpen, onClose, type, student }) {
 }
 
 // ── Student Drawer ────────────────────────────────────────────────────────────
+// Short label per event_type — same source as InterventionOverlay.jsx's
+// getStruggleReasonText (a full sentence fragment meant for student-facing
+// copy), just condensed for a dense list row here.
+const EVENT_TYPE_LABELS = {
+  gaze_fixation_spike: 'Sustained fixation',
+  gaze_off_screen: 'Looking away',
+  rewatch_spike: 'Repeated rewinds',
+  pause_frequent: 'Repeated pauses',
+  idle_without_progress: 'Idle / no progress',
+  low_quiz_score: 'Low quiz score',
+  repeated_failed_attempts: 'Repeated failed attempts',
+  dsa_stuck: 'Stuck on problem',
+  question_confusion: 'Question confusion',
+  general_confusion: 'General confusion',
+};
+
 function StudentDrawer({ student, onClose, onOperation }) {
+  const [detail, setDetail] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Previously this drawer only ever showed the same three numbers already
+  // visible in the table row it was opened from (struggle count, resolved
+  // count, risk badge) — no course progress, no struggle history, nothing
+  // about *what* actually happened. Fetches the real detail endpoint every
+  // time a different student is opened.
+  useEffect(() => {
+    if (!student) { setDetail(null); return; }
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    api.instructor.getStudentDetail(student.id)
+      .then(d => { if (!cancelled) setDetail(d); })
+      .catch(err => { if (!cancelled) setError(err.message || 'Failed to load student details.'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [student]);
+
   if (!student) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="fixed inset-0 bg-black/30 backdrop-blur-sm animate-page-enter" onClick={onClose}/>
@@ -1229,6 +1652,9 @@ function StudentDrawer({ student, onClose, onOperation }) {
             </div>
             <div>
               <p className="text-base font-semibold text-[var(--text)]">{student.name}</p>
+              {(detail?.email || student.email) && (
+                <p className="text-xs text-[var(--text-faint)] mt-0.5">{detail?.email || student.email}</p>
+              )}
               <div className="flex items-center gap-2 mt-1.5">
                 <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
                   student.risk === 'high' ? 'bg-red-50 text-red-700 border-red-200' :
@@ -1249,6 +1675,66 @@ function StudentDrawer({ student, onClose, onOperation }) {
               <p className="text-sm font-semibold text-[var(--text)]">{student.resolved} interventions</p>
             </div>
           </div>
+
+          {loading && (
+            <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-teal-600" /></div>
+          )}
+          {!loading && error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-700">{error}</div>
+          )}
+
+          {!loading && detail && (
+            <>
+              {/* Course progress */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">Course Progress</p>
+                {detail.courses.length === 0 ? (
+                  <p className="text-xs text-[var(--text-faint)]">Not enrolled in any of your courses.</p>
+                ) : detail.courses.map(c => (
+                  <div key={c.course_id} className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-sm font-medium text-[var(--text)]">{c.course_title}</p>
+                      <p className="text-xs font-semibold text-[var(--text-muted)] tabular-nums">{c.lessons_completed}/{c.lessons_total} lessons</p>
+                    </div>
+                    <div className="h-1.5 w-full bg-[var(--border)] rounded-full overflow-hidden">
+                      <div className="h-full bg-teal-500 rounded-full" style={{ width: `${c.completion_pct}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Struggle / hint history */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">
+                  Struggle History {detail.recent_struggles.length > 0 && `(${detail.recent_struggles.length})`}
+                </p>
+                {detail.recent_struggles.length === 0 ? (
+                  <p className="text-xs text-[var(--text-faint)]">No struggle events yet.</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                    {detail.recent_struggles.map(s => (
+                      <div key={s.id} className="bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-medium text-[var(--text)] truncate">{s.title}</p>
+                          <span className="text-[10px] text-[var(--text-faint)] shrink-0 tabular-nums">{timeAgo(s.created_at)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 mt-1">
+                          <p className="text-[10px] text-[var(--text-faint)]" title={getStruggleReasonText(s.event_type) || ''}>
+                            {EVENT_TYPE_LABELS[s.event_type] || s.event_type}
+                          </p>
+                          {s.hint_text
+                            ? <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700"><CheckCircle2 className="w-3 h-3" /> Hint given</span>
+                            : <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700">No hint yet</span>
+                          }
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
           <div className="space-y-2">
             <p className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">Operations</p>
             <button onClick={() => onOperation('message')} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-[var(--border)] text-sm font-medium text-[var(--text)] hover:bg-[var(--surface)] transition-colors focus-visible:ring-2 focus-visible:ring-teal-400">
@@ -1321,7 +1807,17 @@ function StudentsTab() {
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
                 {students.map((s) => (
-                  <tr key={s.id} className="hover:bg-[var(--surface)] transition-colors">
+                  // Previously only the tiny Eye icon opened details — the
+                  // rest of the row did nothing when clicked, which reads
+                  // as broken on a row that's otherwise the obvious click
+                  // target. Whole row now opens the drawer; the action
+                  // buttons stop the click from bubbling so they still do
+                  // their own thing instead of also opening it.
+                  <tr
+                    key={s.id}
+                    onClick={() => setSelectedStudent(s)}
+                    className="hover:bg-[var(--surface)] transition-colors cursor-pointer"
+                  >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 font-bold flex items-center justify-center text-xs shrink-0">
@@ -1347,16 +1843,16 @@ function StudentsTab() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button 
-                          onClick={() => handleOperation('message', s)} 
-                          className="p-1.5 text-[var(--text-faint)] hover:text-teal-600 hover:bg-teal-50 rounded transition-colors" 
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleOperation('message', s); }}
+                          className="p-1.5 text-[var(--text-faint)] hover:text-teal-600 hover:bg-teal-50 rounded transition-colors"
                           title="Message Student"
                         >
                           <Mail className="w-4 h-4" />
                         </button>
-                        <button 
-                          onClick={() => setSelectedStudent(s)} 
-                          className="p-1.5 text-[var(--text-faint)] hover:text-teal-600 hover:bg-teal-50 rounded transition-colors" 
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSelectedStudent(s); }}
+                          className="p-1.5 text-[var(--text-faint)] hover:text-teal-600 hover:bg-teal-50 rounded transition-colors"
                           title="View Details"
                         >
                           <Eye className="w-4 h-4" />
@@ -1387,105 +1883,50 @@ function StudentsTab() {
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function InstructorDashboard() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview');
+  
+  const queryParams = new URLSearchParams(location.search);
+  const activeTabFromUrl = queryParams.get('tab');
+  const activeTab = activeTabFromUrl && ['overview', 'courses', 'students'].includes(activeTabFromUrl) ? activeTabFromUrl : 'overview';
+
+  const setActiveTab = (tab) => {
+    navigate(`/instructor?tab=${tab}`);
+  };
+
+  const user = getCurrentUser() || { full_name: 'Instructor', role: 'instructor' };
+  const initials = user.full_name ? user.full_name.charAt(0).toUpperCase() : 'I';
 
   const pageTitle = {
     overview:  'Class Overview',
     courses:   'Course Management',
     students:  'Students',
-    analytics: 'Analytics',
-    settings:  'Settings',
   }[activeTab];
 
   const pageSubtitle = {
-    overview:  'Physics 301 · Thermodynamics · Spring 2026',
+    overview:  'Platform wide performance metrics',
     courses:   'Create and manage your courses, modules and lessons',
     students:  'Student activity and support',
-    analytics: 'Detailed performance metrics',
-    settings:  'Platform and notification settings',
   }[activeTab];
 
   return (
-    <div className="flex h-screen app-bg font-sans overflow-hidden">
+    <div className="page-shell">
 
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:flex h-full shrink-0">
-        <aside className={`shrink-0 flex flex-col sidebar-light transition-all duration-300 ${sidebarOpen ? 'w-52' : 'w-16'}`}>
-          <div className="h-14 flex items-center gap-2.5 px-4 border-b border-[var(--border)] shrink-0">
-            <div className="w-7 h-7 rounded-lg bg-teal-700 text-white flex items-center justify-center font-bold text-sm shrink-0">A</div>
-            {sidebarOpen && <span className="font-bold text-sm tracking-tight text-[var(--text)]">A-Quire</span>}
-          </div>
-          <nav className="flex-1 py-4 px-2 space-y-0.5" aria-label="Instructor navigation">
-            {NAV.map(({ id, icon: Icon, label }) => (
-              <button
-                key={id}
-                onClick={() => { setActiveTab(id); setMobileOpen(false); }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sidebar-nav-item ${
-                  activeTab === id ? 'active' : ''
-                }`}
-                aria-current={activeTab === id ? 'page' : undefined}
-              >
-                <Icon className={`w-4 h-4 shrink-0 ${activeTab === id ? 'text-teal-700' : ''}`} />
-                {sidebarOpen && label}
-              </button>
-            ))}
-          </nav>
-          <div className="p-3 border-t border-[var(--border)] shrink-0">
-            <div className={`flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-[var(--surface-2)] cursor-pointer ${!sidebarOpen && 'justify-center'}`}>
-              <div className="w-7 h-7 rounded-full bg-teal-700 text-white text-xs font-bold flex items-center justify-center shrink-0">AD</div>
-              {sidebarOpen && (
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-[var(--text)] truncate">Dr. Alan Davis</p>
-                  <p className="text-[10px] text-[var(--text-faint)] truncate">Instructor</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </aside>
-      </div>
+      {/* Sidebar */}
+      <InstructorSidebar 
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+        activeId={activeTab}
+      />
 
-      {/* Mobile Sidebar */}
-      <div className={`lg:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setMobileOpen(false)}>
-        <div className={`fixed inset-y-0 left-0 shadow-2xl sidebar-light w-64 flex flex-col transition-transform duration-300 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`} onClick={e => e.stopPropagation()}>
-            <div className="h-14 flex items-center gap-2.5 px-4 border-b border-[var(--border)] shrink-0 justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-teal-700 text-white flex items-center justify-center font-bold text-sm shrink-0">A</div>
-                <span className="font-bold text-sm tracking-tight text-[var(--text)]">A-Quire</span>
-              </div>
-              <button onClick={() => setMobileOpen(false)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-2)] transition-colors">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <nav className="flex-1 py-4 px-2 space-y-0.5 overflow-y-auto">
-              {NAV.map(({ id, icon: Icon, label }) => (
-                <button
-                  key={id}
-                  onClick={() => { setActiveTab(id); setMobileOpen(false); }}
-                  className={`sidebar-nav-item ${
-                    activeTab === id ? 'active' : ''
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 shrink-0 ${activeTab === id ? 'text-teal-700' : ''}`} />
-                  {label}
-                </button>
-              ))}
-            </nav>
-            <div className="p-3 border-t border-[var(--border)] shrink-0">
-              <div className="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-[var(--surface-2)]">
-                <div className="w-7 h-7 rounded-full bg-teal-700 text-white text-xs font-bold flex items-center justify-center shrink-0">AD</div>
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-[var(--text)] truncate">Dr. Alan Davis</p>
-                  <p className="text-[10px] text-[var(--text-faint)] truncate">Instructor</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+
 
       {/* Main */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+      <div className="page-main">
         <header className="h-14 app-header flex items-center justify-between px-6 shrink-0">
           <div className="flex items-center gap-3">
             <button
@@ -1520,8 +1961,6 @@ export default function InstructorDashboard() {
           {activeTab === 'overview'  && <OverviewTab setActiveTab={setActiveTab} />}
           {activeTab === 'courses'   && <CoursesTab />}
           {activeTab === 'students'  && <StudentsTab />}
-          {activeTab === 'analytics' && <div className="text-sm text-[var(--text-muted)] text-center py-16">Analytics — coming in Phase 5</div>}
-          {activeTab === 'settings'  && <div className="text-sm text-[var(--text-muted)] text-center py-16">Settings — coming in Phase 6</div>}
         </main>
       </div>
     </div>
