@@ -1,3 +1,4 @@
+import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 /**
  * gazeEngine.js
  * 
@@ -95,9 +96,11 @@ export function extractFeatures(landmarks, isMirrored = true) {
 
     // --- Horizontal Ratios ---
     // Projection of iris onto the inner-outer axis
-    // Ratio = dist(outer, iris) / dist(outer, inner)  -- assuming 0 is outer, 1 is inner.
+    // Ratio = dist(left_bound, iris) / dist(left_bound, right_bound)
+    // For left eye (viewer's left), outer is left and inner is right.
     let leftIrisX = safeDiv(lIris.x - lOuter.x, lInner.x - lOuter.x);
-    let rightIrisX = safeDiv(rIris.x - rOuter.x, rInner.x - rOuter.x);
+    // For right eye (viewer's right), inner is left and outer is right.
+    let rightIrisX = safeDiv(rIris.x - rInner.x, rOuter.x - rInner.x);
 
     // --- Vertical Ratios ---
     // Ratio = dist(upper, iris) / dist(upper, lower)
@@ -138,11 +141,14 @@ export function extractFeatures(landmarks, isMirrored = true) {
 
     // --- Head Pose (Yaw and Pitch) ---
     // Simple heuristic: 
+    // Normalize by inter-ocular distance (iod) to make it scale-invariant
+    // so moving forward/backward doesn't break the features.
+    const iod = dist(lOuter, rOuter);
     // Yaw: diff in Z depth between outer corners
-    const headYaw = clamp((lOuter.z - rOuter.z) * 10, -2, 2); 
+    const headYaw = clamp(safeDiv(lOuter.z - rOuter.z, iod), -2, 2); 
     // Pitch: nose Y relative to eyes Y
     const avgEyeY = (lOuter.y + rOuter.y) / 2.0;
-    const headPitch = clamp((avgEyeY - nose.y) * 10, -2, 2);
+    const headPitch = clamp(safeDiv(avgEyeY - nose.y, iod), -2, 2);
 
     const vector = [
       leftIrisX,
@@ -162,5 +168,102 @@ export function extractFeatures(landmarks, isMirrored = true) {
   } catch (e) {
     console.error("Error extracting features", e);
     return null;
+  }
+}
+
+
+const WASM_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm';
+const MODEL_PATH = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+
+// Caches the IN-FLIGHT init call (not the resolved instance — see below) so
+// concurrent/near-simultaneous callers share one real initialization
+// instead of each starting an independent one. This matters because
+// useGazeTracker.js's own per-instance `faceLandmarkerRef` guard
+// (`if (!faceLandmarkerRef.current) faceLandmarkerRef.current = await
+// initFaceLandmarker()`) does NOT protect against this: React 18
+// StrictMode intentionally double-invokes effects in dev (mount, cleanup,
+// mount again), and the two invocations run before either's async work has
+// settled — both see `faceLandmarkerRef.current` still null and each call
+// this function, so without dedup here they each independently fetch the
+// ~4MB+ WASM+model and construct a full FaceLandmarker (visible as two
+// separate "Created TensorFlow Lite XNNPACK delegate" logs several seconds
+// apart — the second call tears down/outraces the first's still-pending
+// work via the caller's own session-id bookkeeping, but this function has
+// no way to know that and completes its own independent init regardless).
+//
+// Deliberately NOT caching the *resolved instance* long-term: callers
+// (see useGazeTracker.js's stopActiveTracker()) call `.close()` on the
+// instance directly when tracking stops, and this module has no way to
+// learn about that. Caching only the in-flight promise — cleared once it
+// settles, success or failure — dedupes exactly the concurrent-call window
+// that causes the double-init, while still allowing a genuinely fresh
+// re-init later (after the previous instance was closed elsewhere).
+let _initPromise = null;
+
+// How many total attempts to make at the *whole* init sequence (WASM fetch
+// + GPU/CPU delegate creation) before actually giving up and letting the
+// caller fall back to legacy. A transient CDN hiccup on the WASM fetch —
+// one slow/dropped connection — used to throw immediately and silently
+// (see below), making the "new" tracker instantly fall back to legacy on a
+// blip that a plain retry would have ridden out; legacyGazeTracker.js's own
+// later, separate init attempt would then usually succeed by coincidence
+// (the hiccup had passed / the resource was warm in cache by then), making
+// it look like the new tracker was just broken. Retrying here, in the same
+// place the failure actually happens, means a transient blip no longer
+// costs the student the calibrated tracker for the whole session.
+const INIT_ATTEMPTS = 2;
+const RETRY_DELAY_MS = 500;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export async function initFaceLandmarker() {
+  if (_initPromise) return _initPromise;
+
+  _initPromise = (async () => {
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= INIT_ATTEMPTS; attempt++) {
+      try {
+        // Previously unguarded: if this specific call threw (e.g. a
+        // transient network error fetching the WASM binary), the whole
+        // function rejected immediately without ever reaching the
+        // GPU/CPU delegate loop below — which is the only place this
+        // function logs anything. That made a plain network blip look
+        // like a silent, instant failure with zero diagnostic trace.
+        const vision = await FilesetResolver.forVisionTasks(WASM_CDN);
+
+        // Try GPU first, then CPU
+        for (const delegate of ['GPU', 'CPU']) {
+          try {
+            const faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+              baseOptions: { modelAssetPath: MODEL_PATH, delegate },
+              outputFaceBlendshapes: false,
+              runningMode: 'VIDEO',
+              numFaces: 1,
+            });
+            console.log(`[gazeEngine] Initialized with ${delegate} delegate (attempt ${attempt}/${INIT_ATTEMPTS})`);
+            return faceLandmarker;
+          } catch (err) {
+            console.warn(`[gazeEngine] ${delegate} delegate failed (attempt ${attempt}/${INIT_ATTEMPTS}):`, err.message);
+            lastError = err;
+          }
+        }
+      } catch (err) {
+        console.warn(`[gazeEngine] WASM fileset load failed (attempt ${attempt}/${INIT_ATTEMPTS}):`, err.message);
+        lastError = err;
+      }
+
+      if (attempt < INIT_ATTEMPTS) await sleep(RETRY_DELAY_MS);
+    }
+
+    throw new Error(
+      `FaceLandmarker init failed after ${INIT_ATTEMPTS} attempts: ${lastError?.message || 'unknown error'}`
+    );
+  })();
+
+  try {
+    return await _initPromise;
+  } finally {
+    _initPromise = null; // resolved or rejected — no longer "in flight"
   }
 }

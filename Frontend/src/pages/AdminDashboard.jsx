@@ -111,7 +111,7 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('');
 
   return (
-    <div className="flex h-screen app-bg font-sans text-[var(--text)] overflow-hidden text-[13px]">
+    <div className="page-shell text-[13px]">
 
       {/* Sidebar */}
       <aside className={`shrink-0 sidebar-dark flex flex-col border-r border-[var(--sidebar-border)] transition-all duration-200 ${collapsed ? 'w-14' : 'w-52'}`}>
@@ -154,7 +154,7 @@ export default function AdminDashboard() {
       </aside>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+      <div className="page-main">
 
         {/* Topbar */}
         <header className="h-14 app-header flex items-center gap-3 px-5 shrink-0">

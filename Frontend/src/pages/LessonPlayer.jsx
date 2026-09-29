@@ -1,964 +1,1196 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  Play, Pause, SkipBack, Volume2, Maximize, Settings, MessageSquare, 
-  ChevronLeft, BrainCircuit, Type, FileText, Bot, Loader2, Sparkles, HelpCircle,
-  CheckCircle2, Clock
-} from 'lucide-react';
-import { api } from '../services/api';
-
-function parseDSAMarkdown(md) {
-  if (!md) return null;
-
-  const result = {
-    title: "",
-    topic: "",
-    difficulty: "Medium",
-    leetcode: "",
-    tuf: "",
-    youtube: "",
-    article: "",
-    problemStatement: "",
-    approaches: []
-  };
-
-  // Extract Title
-  const titleMatch = md.match(/^#\s+(.+)$/m);
-  if (titleMatch) {
-    result.title = titleMatch[1].trim();
-  }
-
-  // Extract Topic
-  const topicMatch = md.match(/-\s+\*\*Topic:\*\*\s*(.+)$/m);
-  if (topicMatch) {
-    result.topic = topicMatch[1].trim();
-  }
-
-  // Extract Difficulty
-  const diffMatch = md.match(/-\s+\*\*Difficulty:\*\*\s*(.+)$/m);
-  if (diffMatch) {
-    result.difficulty = diffMatch[1].trim();
-  }
-
-  // Extract LeetCode
-  const leetMatch = md.match(/-\s+\*\*LeetCode Link:\*\*\s*\[.+\]\((.+?)\)/m);
-  if (leetMatch) {
-    result.leetcode = leetMatch[1].trim();
-  }
-
-  // Extract TUF+
-  const tufMatch = md.match(/-\s+\*\*TUF\+ Link:\*\*\s*\[.+\]\((.+?)\)/m);
-  if (tufMatch) {
-    result.tuf = tufMatch[1].trim();
-  }
-
-  // Extract YouTube
-  const ytMatch = md.match(/-\s+\*\*YouTube Video:\*\*\s*\[.+\]\((.+?)\)/m);
-  if (ytMatch) {
-    result.youtube = ytMatch[1].trim();
-  }
-
-  // Extract Article
-  const articleMatch = md.match(/-\s+\*\*Article Link:\*\*\s*\[.+\]\((.+?)\)/m);
-  if (articleMatch) {
-    result.article = articleMatch[1].trim();
-  }
-
-  // Extract Problem Statement
-  const problemStart = md.indexOf("## Problem Statement");
-  if (problemStart !== -1) {
-    const searchArea = md.substring(problemStart + "## Problem Statement".length);
-    const endIdx = searchArea.search(/(---|\#\#\s+)/);
-    if (endIdx !== -1) {
-      result.problemStatement = searchArea.substring(0, endIdx).trim();
-    } else {
-      result.problemStatement = searchArea.trim();
-    }
-  }
-
-  // Parse Approaches
-  const approachesBlockStart = md.indexOf("## Approaches");
-  if (approachesBlockStart !== -1) {
-    const approachesText = md.substring(approachesBlockStart + "## Approaches".length);
-    const approachParts = approachesText.split(/\n###\s+/);
-    for (let i = 1; i < approachParts.length; i++) {
-      const part = approachParts[i];
-      const lines = part.split("\n");
-      const approachName = lines[0].trim();
-      const approachContent = lines.slice(1).join("\n");
-
-      // Complexity Analysis
-      let timeComplexity = "";
-      let spaceComplexity = "";
-      const tcMatch = approachContent.match(/-\s+\*\*Time Complexity:\*\*\s*(.+)$/m);
-      if (tcMatch) timeComplexity = tcMatch[1].trim();
-      const scMatch = approachContent.match(/-\s+\*\*Space Complexity:\*\*\s*(.+)$/m);
-      if (scMatch) spaceComplexity = scMatch[1].trim();
-
-      // Extract Complexity text
-      const complexityStart = approachContent.indexOf("#### Complexity Analysis");
-      let complexityText = "";
-      if (complexityStart !== -1) {
-        const searchArea = approachContent.substring(complexityStart + "#### Complexity Analysis".length);
-        const endIdx = searchArea.search(/(####\s+Code\s+Solutions|###|$)/);
-        if (endIdx !== -1) {
-          complexityText = searchArea.substring(0, endIdx).trim();
-        } else {
-          complexityText = searchArea.trim();
-        }
-      }
-
-      // Code solutions
-      const codes = {};
-      const codeBlockRegex = /#####\s+(CPP|JAVA|PYTHON|JAVASCRIPT)\s*\n\s*```(cpp|java|python|javascript)\n([\s\S]*?)\n```/gi;
-      let codeMatch;
-      while ((codeMatch = codeBlockRegex.exec(approachContent)) !== null) {
-        const lang = codeMatch[1].toUpperCase();
-        const code = codeMatch[3];
-        codes[lang] = code;
-      }
-
-      result.approaches.push({
-        name: approachName,
-        timeComplexity,
-        spaceComplexity,
-        complexityText,
-        codes
-      });
-    }
-  }
-
-  return result;
-}
-
-function getYouTubeEmbedUrl(url) {
-  if (!url) return "";
-  let videoId = "";
-  if (url.includes("youtu.be/")) {
-    videoId = url.split("youtu.be/")[1].split("?")[0];
-  } else if (url.includes("youtube.com/watch")) {
-    const params = new URLSearchParams(url.split("?")[1]);
-    videoId = params.get("v");
-  } else if (url.includes("youtube.com/embed/")) {
-    return url;
-  }
-  return videoId ? `https://www.youtube.com/embed/${videoId}` : "";
-}
-
-const renderMarkdownContent = (text) => {
-  if (!text) return null;
-  
-  const lines = text.split("\n");
-  return (
-    <div className="space-y-2 text-stone-300 leading-relaxed font-normal text-sm">
-      {lines.map((line, idx) => {
-        const trimmed = line.trim();
-        if (trimmed.startsWith("### ")) {
-          return <h3 key={idx} className="text-base font-semibold text-white mt-3 mb-1">{trimmed.substring(4)}</h3>;
-        }
-        if (trimmed.startsWith("## ")) {
-          return <h2 key={idx} className="text-lg font-bold text-white mt-4 mb-2 border-b border-stone-850 pb-1">{trimmed.substring(3)}</h2>;
-        }
-        if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-          const content = trimmed.substring(2);
-          return (
-            <li key={idx} className="ml-4 list-disc pl-1 text-stone-300">
-              {parseBoldText(content)}
-            </li>
-          );
-        }
-        if (trimmed === "---") {
-          return <hr key={idx} className="border-stone-850 my-3" />;
-        }
-        if (trimmed) {
-          return <p key={idx}>{parseBoldText(trimmed)}</p>;
-        }
-        return <div key={idx} className="h-1.5" />;
-      })}
-    </div>
-  );
-};
-
-const parseBoldText = (text) => {
-  const parts = text.split(/\*\*(.*?)\*\*/g);
-  return parts.map((part, i) => (
-    i % 2 === 1 ? <strong key={i} className="text-teal-400 font-semibold">{part}</strong> : part
-  ));
-};
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { api, connectNotifications, getAccessToken, ensureFreshAccessToken, getCurrentUser } from '../services/api';
+import { useTheme } from '../contexts/ThemeContext';
+import VideoPlayer from '../components/lesson/VideoPlayer';
+import MentorPanel from '../components/lesson/MentorPanel';
+import InterventionOverlay, { getInterventionSeverity, getStruggleReasonText } from '../components/lesson/InterventionOverlay';
+import TranscriptPanel from '../components/lesson/TranscriptPanel';
+import StudyMaterialPanel from '../components/lesson/StudyMaterialPanel';
+import PersonalNotesPanel from '../components/lesson/PersonalNotesPanel';
+import { LoadingState, ErrorState } from '../components/UXStates';
+import { useGaze } from '../contexts/GazeProvider';
+import GazeStatusPill from '../components/GazeStatusPill';
+import LiveCameraPreview from '../components/lesson/LiveCameraPreview';
+import { TrackingState, AttentionState } from '../utils/gazeState';
+import './LessonPlayer.css';
 
 export default function LessonPlayer() {
   const navigate = useNavigate();
+  const { theme, toggle } = useTheme();
+  const [searchParams] = useSearchParams();
+  const lessonId = Number(searchParams.get('id')) || null;
   const [lesson, setLesson] = useState(null);
+  const [progress, setProgress] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  // Video state
-  const videoRef = useRef(null);
+  const [error, setError] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const [speed, setSpeed] = useState('1x');
+  const [activeTab, setActiveTab] = useState('transcript');
+  const [activeChapter, setActiveChapter] = useState(2);
+  const videoRef = useRef(null);
 
-  // DSA States
-  const [dsaData, setDsaData] = useState(null);
-  const [activeApproachIdx, setActiveApproachIdx] = useState(0);
-  const [activeLanguage, setActiveLanguage] = useState("PYTHON");
-  const [activeDsaTab, setActiveDsaTab] = useState("problem");
-  const [studyTimerActive, setStudyTimerActive] = useState(false);
-  const [copySuccess, setCopySuccess] = useState(false);
-  
-  // Struggle state
-  const [interventionActive, setInterventionActive] = useState(false);
-  const [currentStruggleId, setCurrentStruggleId] = useState(null);
-  const [mentorHint, setMentorHint] = useState("");
-  const [hintLevel, setHintLevel] = useState("basic");
-  const [isHintLoading, setIsHintLoading] = useState(false);
-
-  // Chat conversation
-  const [chatMessages, setChatMessages] = useState([
-    { role: 'assistant', text: "Hello! I am your AI Mentor. I will track your playback and step in if you experience any confusion. Feel free to ask questions here!" }
-  ]);
-  const [userInput, setUserInput] = useState("");
-
-  // Layout state
-  const [showMentor, setShowMentor] = useState(true);
-  const [activeTab, setActiveTab] = useState('transcript'); // transcript, notes
-  const [notes, setNotes] = useState("");
-
-  useEffect(() => {
-    async function loadLesson() {
-      setLoading(true);
-      try {
-        const queryParams = new URLSearchParams(window.location.search);
-        const lessonId = Number(queryParams.get('id')) || 3; // Default to seeded Heat Capacity lesson
-        
-        const data = await api.lessons.get(lessonId);
-        setLesson(data);
-        setDuration(data.duration_seconds || 60);
-
-        // Check if this is a DSA lesson
-        if (data.description && (data.description.trim().startsWith("#") || data.video_url === null || data.video_url.includes("youtu"))) {
-          const parsed = parseDSAMarkdown(data.description);
-          if (parsed && parsed.title) {
-            setDsaData(parsed);
-            setStudyTimerActive(true);
-          }
-        }
-
-        // Fetch user's current progress for this lesson
-        const prog = await api.progress.get(lessonId);
-        if (prog && prog.watched_seconds > 0) {
-          setCurrentTime(prog.watched_seconds);
-          if (videoRef.current) {
-            videoRef.current.currentTime = prog.watched_seconds;
-          }
-        }
-        setLoading(false);
-      } catch (err) {
-        setError(err.message || "Failed to load lesson details.");
-        setLoading(false);
-      }
-    }
-    loadLesson();
+  // Merge a partial lesson update (from StudyMaterialPanel's PDF/notes
+  // upload/save calls) into local state without a full lesson refetch.
+  const handleLessonUpdate = useCallback((partial) => {
+    setLesson((prev) => (prev ? { ...prev, ...partial } : prev));
   }, []);
 
-  // Periodic progress reporting (every 5 seconds)
+  // Gaze Integration
+  const {
+    trackingState,
+    attentionState,
+    isTracking,
+    calibration,
+    startTracking,
+    stopTracking,
+    startCalibration,
+    requestTracking,
+    stream
+  } = useGaze();
+
+  const isTrackingEnabled = isTracking;
+  const isCalibrated = calibration.status === 'calibrated';
+
+  const [showLivePreview, setShowLivePreview] = useState(true);
+
+  // Start gaze tracking as soon as the lesson page opens, instead of
+  // waiting for the student to find and click the toggle in
+  // LiveCameraPreview. requestTracking() (not startTracking() directly)
+  // still respects consent: if the camera was already approved in a
+  // previous session it starts immediately, otherwise it shows the
+  // GazePermissionModal explanation first — this only removes the extra
+  // manual step, not the consent decision itself. Calibration then
+  // auto-follows once tracking is healthy (see GazeProvider.jsx).
   useEffect(() => {
-    if (!lesson) return;
+    requestTracking();
+  // Once per mount — requestTracking reads current consent state itself
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    if (dsaData) {
-      if (!studyTimerActive) return;
-      
-      const interval = setInterval(async () => {
-        setCurrentTime(prev => {
-          const newTime = prev + 5;
-          const pct = Math.min((newTime / duration) * 100, 105);
-          
-          api.progress.update(lesson.id, newTime, Math.min(pct, 100), pct >= 90).catch(err => {
-            console.error("DSA Progress save failed:", err);
-          });
-          
-          return newTime;
+  // Also read course_id from URL if navigated from CourseDetail
+  const courseId = Number(searchParams.get('course_id')) || null;
+
+  // ── Struggle Detection State ───────────────────────────────────────────────
+  const [struggleEventId, setStruggleEventId] = useState(null);
+  // struggleEvent holds the full monitor result so InterventionOverlay can
+  // compute severity. Must be declared here — setStruggleEvent is called
+  // inside detectStruggleRef; if missing it throws a ReferenceError that
+  // silently prevents struggleEventIdRef from ever being set.
+  const [struggleEvent, setStruggleEvent] = useState(null);
+  const [showOverlay, setShowOverlay] = useState(false);
+  const [mentorOpen, setMentorOpen] = useState(true);
+  const [hints, setHints] = useState([]);
+  const [hintLoading, setHintLoading] = useState(false);
+  // True only when the *system* auto-detected a struggle (gaze/inactivity).
+  // False for manual "Ask mentor" requests — controls which context banner
+  // is shown in MentorPanel (amber "stuck" vs neutral "here to help").
+  const [isAutoDetected, setIsAutoDetected] = useState(false);
+
+  // Refs — mutable values that don't trigger re-renders
+  const pauseCountRef = useRef(0);
+  const lastPauseAtSecRef = useRef(null); // playhead position (seconds) of the most recent pause — fallback when there's no transcript
+  const lastPauseSegmentRef = useRef(null); // transcript segment index of the most recent pause, when a transcript exists
+  const lastPauseAtMsRef = useRef(0); // wall-clock time of the most recent pause
+  const rewatchCountRef = useRef(0);
+  const lastRewatchToRef = useRef(null); // playhead position (seconds) the most recent rewind landed on — fallback when there's no transcript
+  const lastRewatchSegmentRef = useRef(null); // transcript segment index the most recent rewind landed on, when a transcript exists
+  const lastRewatchAtMsRef = useRef(0);  // wall-clock time of the most recent rewind
+  const currentTimeRef = useRef(0);
+  const inactivityTimerRef = useRef(null);
+  const idleStartRef = useRef(null);
+  const progressSaveTimerRef = useRef(null);
+  const mainContainerRef = useRef(null);
+  // Auto-struggle budget for this lesson visit: up to maxAutoHintsPerLesson
+  // triggers, each at least autoHintCooldownMs apart. Shared across gaze
+  // (fixation/inactivity) and behavioral (pause/rewatch/idle) triggers —
+  // replaces a one-shot "fire once ever" latch so the config is meaningful.
+  const autoStruggleCountRef = useRef(0);
+  const lastAutoStruggleAtRef = useRef(0);
+  const wsRef = useRef(null);
+  const lessonRef = useRef(null);             // always-current lesson (avoids stale closures)
+  const struggleEventIdRef = useRef(null);    // always-current event ID
+  // Function refs — reassigned each render so callbacks always call the latest version
+  const detectStruggleRef = useRef(null);
+  const handleGetHintRef = useRef(null);
+
+  // Auto-struggle budget gate — see refs above. Manual triggers don't consume
+  // the budget but do restart the cooldown, so an auto-trigger can't fire
+  // immediately after the student already asked for help themselves.
+  const canFireAutoStruggle = useCallback(() => {
+    if (autoStruggleCountRef.current >= 3) return false;
+    if (Date.now() - lastAutoStruggleAtRef.current < 60000) return false;
+    return true;
+  }, []);
+
+  const markAutoStruggleFired = useCallback(() => {
+    autoStruggleCountRef.current += 1;
+    lastAutoStruggleAtRef.current = Date.now();
+  }, []);
+
+  // Gaze-assisted struggle cooldowns
+  const gazeCooldownRef = useRef(0);
+  const isGazeStruggleFiredForCurrentEpisode = useRef(false);
+  const isFixationStruggleFiredForCurrentEpisode = useRef(false);
+  const currentOffLessonStartMs = useRef(null);
+  const lastInteractionMsRef = useRef(Date.now());
+
+  // Track user interactions to reset playback inactivity timer
+  useEffect(() => {
+    const handleInteract = () => { lastInteractionMsRef.current = Date.now(); };
+    window.addEventListener('mousemove', handleInteract);
+    window.addEventListener('click', handleInteract);
+    window.addEventListener('keydown', handleInteract);
+    window.addEventListener('scroll', handleInteract, true);
+    return () => {
+      window.removeEventListener('mousemove', handleInteract);
+      window.removeEventListener('click', handleInteract);
+      window.removeEventListener('keydown', handleInteract);
+      window.removeEventListener('scroll', handleInteract, true);
+    };
+  }, []);
+
+  // Gaze-plus-behavior combination rule
+  useEffect(() => {
+    if (trackingState !== TrackingState.TRACKING_ACTIVE) {
+      currentOffLessonStartMs.current = null;
+      isGazeStruggleFiredForCurrentEpisode.current = false;
+      isFixationStruggleFiredForCurrentEpisode.current = false;
+      return;
+    }
+
+    if (attentionState === AttentionState.ON_LESSON || attentionState === AttentionState.UNKNOWN) {
+      currentOffLessonStartMs.current = null;
+      isGazeStruggleFiredForCurrentEpisode.current = false;
+      isFixationStruggleFiredForCurrentEpisode.current = false;
+      return;
+    }
+
+    // Sustained fixation ("confusion") — the tracker itself already
+    // decided this before ever reporting FIXATED (see
+    // legacyGazeTracker.js's own 12s FIXATION_MS timer), unlike
+    // OFF_LESSON below where *this* effect accumulates the duration.
+    // This branch previously didn't exist: attentionState reaching
+    // FIXATED fell through every check below untouched, so a correctly-
+    // detected confusion episode never actually triggered anything a
+    // student could see — the whole pathway from gaze fixation to an AI
+    // mentor hint was missing its last link.
+    if (attentionState === AttentionState.FIXATED) {
+      currentOffLessonStartMs.current = null;
+      if (!isFixationStruggleFiredForCurrentEpisode.current && canFireAutoStruggle() && Date.now() - gazeCooldownRef.current >= 60000) {
+        isFixationStruggleFiredForCurrentEpisode.current = true;
+        gazeCooldownRef.current = Date.now();
+        markAutoStruggleFired();
+        detectStruggleRef.current?.({
+          isManual: false,
+          fixationMs: 12000, // legacyGazeTracker.js's FIXATION_MS — the threshold that actually fired this
+          inactivityMs: 0,
+          idleSeconds: 0
         });
-      }, 5000);
-      
-      return () => clearInterval(interval);
-    } else {
-      if (!isPlaying) return;
+      }
+      return;
+    }
+    isFixationStruggleFiredForCurrentEpisode.current = false;
 
-      const interval = setInterval(async () => {
-        if (videoRef.current) {
-          const time = videoRef.current.currentTime;
-          const pct = (time / duration) * 100;
-          try {
-            await api.progress.update(lesson.id, time, pct);
-          } catch (err) {
-            console.error("Progress save failed:", err);
+    if (attentionState === AttentionState.OFF_LESSON) {
+      if (!currentOffLessonStartMs.current) {
+        currentOffLessonStartMs.current = Date.now();
+      }
+
+      const offLessonDuration = Date.now() - currentOffLessonStartMs.current;
+
+      // Rule: Sustained OFF_LESSON for >= 20 seconds
+      if (offLessonDuration >= 20000) {
+        if (!isGazeStruggleFiredForCurrentEpisode.current && Date.now() - gazeCooldownRef.current >= 60000) {
+          
+          let behaviorCorroborated = false;
+          const timeSinceInteraction = Date.now() - lastInteractionMsRef.current;
+          
+          if (isPlaying && timeSinceInteraction >= 45000) {
+            behaviorCorroborated = true; // Playing + no interaction for 45s
+          } else if (!isPlaying && timeSinceInteraction >= 30000) {
+            // Wait, standard pause is > 30s + OFF_LESSON
+            const pauseDuration = Date.now() - (idleStartRef.current || Date.now());
+            if (pauseDuration >= 30000) {
+              behaviorCorroborated = true; // Paused for 30s
+            }
+          }
+
+          if (behaviorCorroborated && canFireAutoStruggle()) {
+            isGazeStruggleFiredForCurrentEpisode.current = true;
+            gazeCooldownRef.current = Date.now();
+            markAutoStruggleFired();
+            detectStruggleRef.current?.({ 
+              isManual: false, 
+              idleSeconds: Math.floor(timeSinceInteraction / 1000), 
+              inactivityMs: timeSinceInteraction,
+              fixationMs: 0 
+            });
           }
         }
-      }, 5000);
-
-      return () => clearInterval(interval);
-    }
-  }, [lesson, isPlaying, studyTimerActive, dsaData, duration]);
-
-  const handlePlayPause = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-        setIsPlaying(false);
-      } else {
-        videoRef.current.play().catch(() => {});
-        setIsPlaying(true);
       }
     }
-  };
+  }, [trackingState, attentionState, isPlaying, canFireAutoStruggle, markAutoStruggleFired]);
 
-  const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-    }
-  };
+  useEffect(() => {
+    let active = true;
+    async function loadLesson() {
+      if (!lessonId) {
+        setError('No lesson selected.');
+        setLoading(false);
+        return;
+      }
 
-  const handleVideoEnded = async () => {
-    setIsPlaying(false);
-    if (lesson) {
+      setLoading(true);
+      setError('');
+
       try {
-        await api.progress.update(lesson.id, duration, 100, true);
-        alert("Lesson completed successfully!");
+        const [lessonData, progressData] = await Promise.all([
+          api.lessons.get(lessonId),
+          api.progress.get(lessonId),
+        ]);
+
+        if (!active) return;
+        setLesson(lessonData);
+        setProgress(progressData);
       } catch (err) {
-        console.error("End progress update failed:", err);
+        if (!active) return;
+        setError(err.message || 'Failed to load lesson data.');
+      } finally {
+        if (!active) return;
+        setLoading(false);
       }
     }
-  };
 
-  const handleTimelineChange = (e) => {
-    const newTime = Number(e.target.value);
-    setCurrentTime(newTime);
-    if (videoRef.current) {
-      videoRef.current.currentTime = newTime;
-    }
-  };
+    loadLesson();
+    return () => {
+      active = false;
+    };
+  }, [lessonId]);
 
-  const handleCopyCode = (codeText) => {
-    if (!codeText) return;
-    navigator.clipboard.writeText(codeText);
-    setCopySuccess(true);
-    setTimeout(() => setCopySuccess(false), 2000);
-  };
+  // Keep lessonRef always current so async callbacks see the latest lesson
+  useEffect(() => { lessonRef.current = lesson; }, [lesson]);
+  useEffect(() => { struggleEventIdRef.current = struggleEventId; }, [struggleEventId]);
 
-  // Simulate a student struggle event
-  const triggerStruggle = async () => {
-    if (!lesson) return;
-    
-    // Pause video / study timer
-    if (videoRef.current) {
-      videoRef.current.pause();
-      setIsPlaying(false);
-    }
-    setStudyTimerActive(false);
+  const [wsStatus, setWsStatus] = useState('connecting');
 
-    setInterventionActive(true);
-    setIsHintLoading(true);
+  // ── WebSocket: receive real-time hint pushes ────────────────────────
+  useEffect(() => {
+    if (!lessonId) return;
+    if (!getAccessToken()) return;
 
-    try {
-      const clientEventId = `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    let reconnectTimeout = null;
+    let attempt = 0;
+    const MAX_ATTEMPTS = 4;
+
+    let cancelled = false;
+
+    const connectWS = async () => {
+      // Proactively refresh on every (re)connect attempt rather than just
+      // re-reading localStorage — access tokens expire after 30 min
+      // (ACCESS_TOKEN_EXPIRE_MINUTES). Re-reading alone only helps if some
+      // unrelated REST call happened to trigger api.js's 401-refresh first;
+      // on a page with no such call, getAccessToken() keeps handing back
+      // the same already-expired token forever. A WS handshake sent with an
+      // expired token gets accepted then immediately closed (code 1008) by
+      // the backend, which Firefox surfaces as "can't establish a
+      // connection" rather than a clean close. ensureFreshAccessToken()
+      // decodes the token's exp claim and, if expired, uses the refresh
+      // token to get a new one before we ever attempt the handshake.
+      const token = await ensureFreshAccessToken();
+      if (cancelled) return;
+      if (!token) {
+        setWsStatus('disconnected');
+        return;
+      }
+      setWsStatus('connecting');
+      const ws = connectNotifications(
+        token,
+        (msg) => {
+          if (msg.type === 'hint' && msg.hint_text) {
+            setHints(prev => {
+              if (prev.length > 0 && prev[prev.length - 1].text === msg.hint_text) return prev;
+              return [...prev, { 
+                role: 'mentor', 
+                text: msg.hint_text,
+                audio_base64: msg.audio_base64 
+              }];
+            });
+            setMentorOpen(true);
+            setHintLoading(false);
+            if (msg.event_id) {
+              setStruggleEventId(msg.event_id);
+              struggleEventIdRef.current = msg.event_id;
+            }
+            setShowOverlay(false);
+            setMentorOpen(true);
+          }
+        },
+        // onError
+        (err) => console.error("WS error:", err),
+        // onClose
+        () => {
+          wsRef.current = null;
+          if (cancelled) return;
+          attempt++;
+          // Previously gave up permanently after MAX_ATTEMPTS (~30s total),
+          // leaving "Live connection lost" up forever with a full page
+          // reload as the only way to recover — even from a purely
+          // transient blip (dev server restart, brief network hiccup) that
+          // would have cleared itself. Now: still surface the
+          // "disconnected" banner once attempts exceed MAX_ATTEMPTS so it's
+          // visibly not silent, but keep retrying indefinitely at the
+          // capped backoff interval in the background. ws.onopen already
+          // resets attempt to 0 and flips wsStatus back to 'connected'
+          // (below), so a background reconnect that succeeds clears the
+          // banner on its own with no user action needed.
+          if (attempt > MAX_ATTEMPTS) setWsStatus('disconnected');
+          const delay = Math.min(1000 * (2 ** Math.min(attempt, MAX_ATTEMPTS)), 15000);
+          reconnectTimeout = setTimeout(connectWS, delay);
+        }
+      );
       
-      // Ingest struggle event to backend
-      const struggle = await api.struggles.createEvent({
-        lessonId: lesson.id,
-        clientEventId,
-        struggle_score: 0.85,
-        lessonTimestampMs: Math.floor(currentTime * 1000),
-        fixationDurationMs: 1200,
-        inactivityDurationMs: 5000,
-        transcriptWindowId: "wnd-001"
+      // We know it connected if onopen triggers, but we don't have onopen exposed.
+      // We can just assume connected if it doesn't close immediately.
+      ws.addEventListener('open', () => {
+        attempt = 0;
+        setWsStatus('connected');
       });
 
-      setCurrentStruggleId(struggle.id);
+      wsRef.current = ws;
+    };
 
-      // Fetch AI hint from backend
-      const hintData = await api.struggles.getHint(struggle.id, hintLevel);
-      setMentorHint(hintData.hint);
-      setChatMessages(prev => [
-        ...prev,
-        { role: 'assistant', text: `[Intervention at ${formatTime(currentTime)}] ${hintData.hint}` }
-      ]);
-      setIsHintLoading(false);
-    } catch (err) {
-      console.error(err);
-      if (dsaData) {
-        setMentorHint(`Struggling with ${dsaData.title}? Pay close attention to the Space and Time complexities of the Optimal approach compared to the Brute Force strategy.`);
-      } else {
-        setMentorHint("The concept of heat capacity and thermal entropy can be complex. Remember, heat capacity is the amount of heat energy needed to raise the temperature of a substance by one degree.");
-      }
-      setIsHintLoading(false);
-    }
+    connectWS();
+
+    return () => {
+      cancelled = true;
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      try { wsRef.current?.close(); } catch (_) {}
+      wsRef.current = null;
+    };
+  }, [lessonId]);
+
+
+
+  // ── Progress auto-save every 15 s while lesson is mounted ────────────
+  useEffect(() => {
+    progressSaveTimerRef.current = setInterval(async () => {
+      if (!lessonId || currentTimeRef.current <= 0) return;
+      const totalSecs = lessonRef.current?.duration_seconds ?? 0;
+      const pct = totalSecs > 0
+        ? Math.min(100, parseFloat(((currentTimeRef.current / totalSecs) * 100).toFixed(1)))
+        : 0;
+      try { await api.progress.update(lessonId, currentTimeRef.current, pct); } catch (_) { /* silent */ }
+    }, 15_000);
+    return () => clearInterval(progressSaveTimerRef.current);
+  }, [lessonId]);
+
+  // ── Struggle detection (stored in ref so stale closures are never an issue) ─
+  // Build a transcript context string from up to 5 segments around the current
+  // playhead position. Stored as `notes` on the struggle event so the AI mentor
+  // can generate a hint that is grounded in what was actually being taught.
+  // Which transcript segment a given playhead time falls in — the actual
+  // line boundary, not a guessed fixed-width window. Shared by the
+  // transcript-context builder below and the rewind/"same line" detector
+  // in handleTimeUpdate, so both agree on what "the same line" means.
+  const findTranscriptSegmentIndex = (segments, currentTimeSecs) => {
+    if (!segments?.length) return -1;
+    const idx = segments.findIndex(s => currentTimeSecs >= s.start && currentTimeSecs <= (s.end ?? s.start + 9999));
+    if (idx >= 0) return idx;
+    // Fallback: last segment whose start is before current time
+    return segments.reduce((best, s, i) => (s.start <= currentTimeSecs ? i : best), -1);
   };
 
-  const handleHintRequest = async (level) => {
-    if (!currentStruggleId) return;
-    setHintLevel(level);
-    setIsHintLoading(true);
+  const buildTranscriptContext = (segments, currentTimeSecs) => {
+    if (!segments?.length) return null;
+    const idx = Math.max(0, findTranscriptSegmentIndex(segments, currentTimeSecs));
+    const start = Math.max(0, idx - 2);
+    const end   = Math.min(segments.length - 1, idx + 2);
+    const text  = segments.slice(start, end + 1).map(s => s.text).join(' ').trim();
+    return text ? text.slice(0, 1800) : null; // cap to notes field limit
+  };
+
+  detectStruggleRef.current = async ({
+    isManual = false,
+    idleSeconds = 0,
+    fixationMs = 0,
+    inactivityMs = 0,
+    struggleScore = null,
+    // Both call sites that actually trigger off a rewind/pause burst reset
+    // rewatchCountRef/pauseCountRef to 0 *before* calling this (see the
+    // "re-arm" comments at those call sites) — this function used to always
+    // read the ref directly, so by the time it ran the value being sent was
+    // already 0, regardless of what really triggered it. The backend's
+    // determine_event_type() then had nothing to classify this as
+    // "rewatch_spike"/"pause_frequent" with, so it fell through to
+    // "general_confusion" every time — which is exactly why the specific
+    // reason text never showed up for these two triggers. Callers that
+    // fire off a specific rewatch/pause burst now pass the pre-reset value
+    // explicitly; anything else (manual trigger, etc.) falls back to
+    // reading the ref's current value, same as before.
+    rewatchCount = null,
+    pauseCount = null,
+  } = {}) => {
+    const user = getCurrentUser();
+    if (!user || !lessonId) return;
+
+    // Gather transcript context around current playhead
+    const transcriptContext = buildTranscriptContext(transcriptItems, currentTimeRef.current);
+    const activeSegId = transcriptItems.find(
+      s => currentTimeRef.current >= s.start && currentTimeRef.current <= (s.end ?? s.start + 9999)
+    )?.id?.toString()?.slice(0, 100) ?? null;
+
     try {
-      const hintData = await api.struggles.getHint(currentStruggleId, level);
-      setMentorHint(hintData.hint);
-      setChatMessages(prev => [
-        ...prev,
-        { role: 'assistant', text: `[${level.toUpperCase()} HINT] ${hintData.hint}` }
-      ]);
-      setIsHintLoading(false);
-    } catch (err) {
-      console.error(err);
-      setIsHintLoading(false);
+      const result = await api.struggles.monitor({
+        student_id: user.id,
+        lesson_id: lessonId,
+        course_id: lessonRef.current?.course_id ?? courseId ?? null,
+        rewatch_count: rewatchCount ?? rewatchCountRef.current,
+        pause_count: pauseCount ?? pauseCountRef.current,
+        idle_seconds: idleSeconds,
+        completion_percent: 0,
+        failed_attempts: 0,
+        lesson_timestamp_ms: currentTimeRef.current * 1000,
+        struggle_score: struggleScore,
+        manual_trigger: isManual,
+        inactivity_duration_ms: (idleSeconds * 1000),
+        fixation_duration_ms: fixationMs,
+        gaze_off_screen_ms: inactivityMs,
+        transcript_window_id: activeSegId,
+        notes: transcriptContext ? `Transcript context: ${transcriptContext}` : null,
+        client_event_id: `lesson-${lessonId}-${Date.now()}`,
+      });
+      if (result?.detected && result?.event_id) {
+        setStruggleEvent(result);
+        setStruggleEventId(result.event_id);
+        struggleEventIdRef.current = result.event_id;
+        if (isManual) {
+          setIsAutoDetected(false); // user asked — not system-detected
+          setMentorOpen(true);
+        } else {
+          setIsAutoDetected(true);  // system detected — show amber banner
+          setShowOverlay(true);
+        }
+      } else if (isManual) {
+        // Manual trigger always opens mentor even without a detected event
+        setMentorOpen(true);
+      }
+    } catch (_) {
+      if (isManual) setMentorOpen(true);
     }
   };
 
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!userInput.trim()) return;
+  // ── Hint fetching (stored in ref) ───────────────────────────────────
+  handleGetHintRef.current = async (level = 'basic', customMsg = null, languageOverride = null) => {
+    // Map MentorPanel shortcut levels → valid backend hint_level + optional
+    // system-injected custom message.
+    // Backend schema only accepts: basic | detailed | example | custom
+    const LEVEL_MAP = {
+      // quiz: ask the AI to generate a question, not a hint
+      quiz:    { apiLevel: 'custom', autoMsg: 'Quiz me with a single question about what was just explained to test my understanding. Ask the question clearly without giving away the answer, then wait for my reply.' },
+      // summary: gentle recap
+      summary: { apiLevel: 'basic',  autoMsg: 'Give me a brief summary of the key points covered so far in this lesson.' },
+      // confused: gentle nudge
+      confused: { apiLevel: 'basic', autoMsg: null },
+      // analogy: relate the concept to something familiar
+      analogy: { apiLevel: 'custom', autoMsg: 'Can you explain this using a simple, everyday analogy?' },
+      // simpler: re-explain in easier terms, not a deeper dive
+      simpler: { apiLevel: 'custom', autoMsg: 'Can you explain that again in simpler terms, using easier vocabulary and shorter sentences?' },
+    };
 
-    const userText = userInput;
-    setChatMessages(prev => [...prev, { role: 'user', text: userText }]);
-    setUserInput("");
+    const mapped   = LEVEL_MAP[level];
+    const safeLevel = mapped?.apiLevel ?? level;
+    // Prefer the caller's customMsg over the auto-generated one
+    const effectiveMsg = customMsg ?? mapped?.autoMsg ?? null;
 
-    // Simulate AI response
-    setTimeout(() => {
-      let reply = "";
-      if (dsaData) {
-        reply = `I see you are asking about ${dsaData.title}. For this problem, the optimal time complexity is usually achievable by using key DSA patterns like two-pointers, hash maps, or dynamic programming. Check the Approaches tab for detailed complexity breakdowns!`;
-        if (userText.toLowerCase().includes("optimal") || userText.toLowerCase().includes("time")) {
-          const opt = dsaData.approaches.find(a => a.name.toLowerCase().includes("optimal"));
-          if (opt) {
-            reply = `The optimal approach for this problem has a Time Complexity of ${opt.timeComplexity} and Space Complexity of ${opt.spaceComplexity}. It is highly recommended to study the code implementation provided.`;
-          }
-        }
+    if (!struggleEventIdRef.current) {
+      // No event yet — create one via manual trigger
+      await detectStruggleRef.current?.({ isManual: true });
+    }
+    const evId = struggleEventIdRef.current;
+    if (!evId) return; // If still no event, bail out.
+
+    if (effectiveMsg && effectiveMsg !== mapped?.autoMsg) {
+      // Only echo student-typed messages into the chat, not system auto-msgs
+      setHints(prev => [...prev, { role: 'student', text: effectiveMsg }]);
+    }
+
+    setHintLoading(true);
+    try {
+      // `hints` here still reflects state from before this turn (React
+      // state updates are async, and the student-echo setHints above hasn't
+      // applied yet) — the prior turns the mentor needs to read a short
+      // reply (e.g. answering its own question) in context instead of as an
+      // unrelated fragment. Same fix as DsaProblemPage.tsx's hint panel.
+      const history = hints.map(h => ({ role: h.role, text: h.text }));
+      const result = await api.struggles.getHint(evId, safeLevel, effectiveMsg, languageOverride, history);
+      if (result?.hint_text) {
+        setHints(prev => {
+          if (prev.length > 0 && prev[prev.length - 1].text === result.hint_text) return prev;
+          // Store the original intent label so MentorPanel can display it
+          return [...prev, { 
+            role: 'mentor', 
+            text: result.hint_text, 
+            level: level,
+            audio_base64: result.audio_base64 
+          }];
+        });
+      }
+    } catch (_) { /* silent */ } finally {
+      setHintLoading(false);
+    }
+  };
+
+  // Hint fetching (stored in ref)
+
+
+  // Stable callbacks that delegate through the refs (safe to pass as props)
+  const onGetHint = useCallback((level, customMsg, languageOverride) => handleGetHintRef.current?.(level, customMsg, languageOverride), []);
+  const onManualMentor = useCallback(() => {
+    lastAutoStruggleAtRef.current = Date.now();
+    setMentorOpen(true);
+    handleGetHintRef.current?.('basic');
+  }, []);
+
+  const handleSeek = useCallback((time) => {
+    if (videoRef.current) {
+      if (typeof videoRef.current.seekTo === 'function') {
+        videoRef.current.seekTo(time, true);
       } else {
-        reply = "I understand you are asking about this concept. In thermodynamics, entropy represents the molecular disorder of a system. As thermal energy transfers, entropy increases.";
-        if (userText.toLowerCase().includes("capacity")) {
-          reply = "Specific heat capacity is the heat energy required to raise the temperature of 1 kg of a substance by 1 Kelvin. Water has a very high specific heat capacity, which is why it heats up slowly.";
+        videoRef.current.currentTime = time;
+      }
+    }
+  }, []);
+
+
+
+  const handleMarkComplete = useCallback(async () => {
+    if (!lessonId) return;
+    try {
+      await api.progress.update(lessonId, currentTimeRef.current, 100, true);
+      setProgress(prev => ({ ...prev, completion_percent: 100, is_completed: true }));
+    } catch (_) { /* silent */ }
+  }, [lessonId]);
+
+  // Neither InterventionOverlay nor MentorPanel's auto-detected banner
+  // showed why a struggle was flagged — always the same generic copy
+  // regardless of which of the five very different signals actually fired.
+  // struggleEvent already carries event_type (from the /struggle/monitor
+  // response's determine_event_type()) — it was just never read.
+  const struggleReasonText = getStruggleReasonText(struggleEvent?.event_type);
+
+  const displayLesson = {
+    course: lesson?.course_title || lesson?.course || '',
+    module: lesson?.module_title || lesson?.module || '',
+    title: lesson?.title || '',
+    description: lesson?.description || '',
+    videoUrl: lesson?.video_url || lesson?.videoUrl || lesson?.video || '',
+    durationSeconds: lesson?.duration_seconds ?? lesson?.durationSeconds ?? lesson?.duration ?? 0,
+  };
+
+  const watchedSeconds = progress?.watched_seconds ?? progress?.watchedSeconds ?? 0;
+  const totalSeconds = displayLesson.durationSeconds;
+  
+  const savedProgress = progress?.completion_percent ?? progress?.completionPercent ?? 0;
+  const computedProgress = totalSeconds > 0 ? Math.min(100, Math.round((watchedSeconds / totalSeconds) * 100)) : 0;
+  const lessonProgress = Math.max(savedProgress, computedProgress);
+  
+  // DEBUG LOGGING
+  console.log('LessonPlayer state:', {
+    watchedSeconds,
+    totalSeconds,
+    savedProgress,
+    computedProgress,
+    lessonProgress,
+    lesson_duration: lesson?.duration_seconds,
+  });
+
+  const currentTime = totalSeconds > 0 ? `${Math.floor(watchedSeconds / 60)}:${String(watchedSeconds % 60).padStart(2, '0')}` : '--:--';
+  const totalTime = totalSeconds > 0 ? `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}` : '--:--';
+
+  const chapters = lesson?.chapters ?? [];
+  const transcriptItems = lesson?.transcript || lesson?.transcript_items || [];
+  const resources = lesson?.resources || lesson?.links || [];
+  const questions = lesson?.questions || lesson?.in_lesson_questions || [];
+
+  const snapshotItems = [
+    lessonProgress !== null ? { title: 'Completion', subtitle: `${Math.round(lessonProgress)}% complete` } : null,
+    lesson?.difficulty ? { title: 'Difficulty', subtitle: lesson.difficulty } : null,
+    lesson?.next_checkpoint ? { title: 'Next checkpoint', subtitle: lesson.next_checkpoint } : null,
+  ].filter(Boolean);
+
+  const hasMetaChips = lesson?.captions_enabled || chapters.length > 0 || transcriptItems.length > 0;
+
+  const togglePlay = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Check if it's a YouTube player (has playVideo method)
+    if (video.playVideo && video.pauseVideo) {
+      // YouTube player API
+      if (video.getPlayerState() === 1) { // 1 = playing
+        video.pauseVideo();
+        setIsPlaying(false);
+      } else {
+        video.playVideo();
+        setIsPlaying(true);
+      }
+    } else if (video.play && video.pause) {
+      // Native video element
+      if (video.paused) {
+        video.play();
+        setIsPlaying(true);
+      } else {
+        video.pause();
+        setIsPlaying(false);
+      }
+    }
+  };
+
+  const toggleSpeed = () => setSpeed(prev => (prev === '1x' ? '1.25x' : '1x'));
+
+  const handleTimeUpdate = useCallback((e) => {
+    if (e?.target?.currentTime !== undefined) {
+      const newTime = Math.floor(e.target.currentTime);
+      // Detect rewatch: student seeked back more than 5 s. This is the
+      // "reading the same line/section again and again" signal.
+      //
+      // Two bugs here previously: (1) a duplicated line incremented the
+      // counter by 2 per detected rewatch instead of 1, so it satisfied
+      // ">= 2" after a single rewind instead of two genuine ones; (2) the
+      // counter never reset except when it fired, so it counted "any 2
+      // rewinds anywhere in the lesson, however far apart" rather than
+      // "rewound to roughly the same spot repeatedly" — two unrelated
+      // rewinds on completely different topics, minutes apart, would
+      // combine to fire even though neither indicates being stuck on any
+      // one thing. "Same spot" is now the actual transcript line the
+      // rewind landed in (via findTranscriptSegmentIndex, using the
+      // lesson's own timestamped transcript segments — lessonRef.current,
+      // not the transcriptItems variable directly, since this callback has
+      // an empty deps array and would otherwise freeze on a stale
+      // transcript from before it loaded), not a guessed fixed-width time
+      // window — lines vary in length, and a fixed window can span
+      // multiple real lines or miss the actual boundary. Falls back to a
+      // fixed window only for lessons with no transcript at all.
+      if (currentTimeRef.current - newTime > 5) {
+        const SAME_SECTION_WINDOW_S = 15; // fallback only — see above
+        const REWATCH_BURST_WINDOW_MS = 3 * 60 * 1000;
+        // The YouTube player is polled every 500ms (see VideoPlayer.jsx),
+        // and a single seek gesture can report a couple of fluctuating/
+        // settling readings before landing — each one would otherwise
+        // count as its own "rewind", so one deliberate 40s jump alone
+        // could reach the ">= 2" threshold and fire on its own. Readings
+        // this close together are the same physical seek settling, not a
+        // second, separate rewind — fold them in without counting again.
+        const MIN_MS_BETWEEN_DISTINCT_REWINDS = 2000;
+        const now = Date.now();
+        const msSinceLastRewind = now - lastRewatchAtMsRef.current;
+
+        if (lastRewatchAtMsRef.current !== 0 && msSinceLastRewind < MIN_MS_BETWEEN_DISTINCT_REWINDS) {
+          lastRewatchToRef.current = newTime;
+          lastRewatchAtMsRef.current = now;
+          currentTimeRef.current = newTime;
+          setProgress(prev => ({ ...prev, watched_seconds: newTime }));
+          return;
+        }
+
+        const segments = lessonRef.current?.transcript || lessonRef.current?.transcript_items || [];
+        const newSegmentIdx = findTranscriptSegmentIndex(segments, newTime);
+        const withinBurstWindow = msSinceLastRewind <= REWATCH_BURST_WINDOW_MS;
+
+        const isSameSection = newSegmentIdx >= 0
+          // Transcript available — "same line" means the actual same
+          // transcript segment as the last rewind landed in (or its
+          // immediate neighbor, allowing a little seek imprecision).
+          ? lastRewatchSegmentRef.current !== null &&
+            Math.abs(newSegmentIdx - lastRewatchSegmentRef.current) <= 1 &&
+            withinBurstWindow
+          // No transcript for this lesson — fall back to a fixed time window.
+          : lastRewatchToRef.current !== null &&
+            Math.abs(newTime - lastRewatchToRef.current) <= SAME_SECTION_WINDOW_S &&
+            withinBurstWindow;
+
+        rewatchCountRef.current = isSameSection ? rewatchCountRef.current + 1 : 1;
+        lastRewatchToRef.current = newTime;
+        lastRewatchSegmentRef.current = newSegmentIdx >= 0 ? newSegmentIdx : null;
+        lastRewatchAtMsRef.current = now;
+
+        if (rewatchCountRef.current >= 2 && canFireAutoStruggle()) {
+          // Captured before the re-arm reset below — detectStruggleRef's
+          // body used to read rewatchCountRef.current directly, but by the
+          // time that async call actually ran, the reset had already
+          // happened synchronously, so the backend always received 0
+          // regardless of the real burst size (see detectStruggleRef's own
+          // comment on this).
+          const firedRewatchCount = rewatchCountRef.current;
+          markAutoStruggleFired();
+          // Re-arm: without this, the next rewatch to this same section
+          // would also satisfy ">= 2" and re-trigger on the next cooldown
+          // tick, even completely normal re-reading — this threshold is
+          // meant to catch a fresh burst, not latch permanently after the
+          // first one.
+          rewatchCountRef.current = 0;
+          lastRewatchToRef.current = null;
+          lastRewatchSegmentRef.current = null;
+          detectStruggleRef.current?.({ isManual: false, idleSeconds: 0, rewatchCount: firedRewatchCount });
         }
       }
-      setChatMessages(prev => [...prev, { role: 'assistant', text: reply }]);
-    }, 1000);
-  };
+      currentTimeRef.current = newTime;
+      setProgress(prev => ({ ...prev, watched_seconds: newTime }));
+    }
+  }, []);
 
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  };
+  const handleDurationChange = useCallback((duration) => {
+    console.log('handleDurationChange called with duration:', duration, 'displayLesson.durationSeconds:', displayLesson.durationSeconds);
+    if (displayLesson.durationSeconds === 0 && duration > 0) {
+      console.log('Updating lesson duration in state to:', duration);
+      setLesson(prev => prev ? { ...prev, duration_seconds: duration } : prev);
+    }
+  }, [displayLesson.durationSeconds]);
+
+  const handlePlay = useCallback(() => {
+    setIsPlaying(true);
+    // Clear inactivity timer when playback resumes
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+    idleStartRef.current = null;
+  }, []);
+
+  const handlePause = useCallback(() => {
+    setIsPlaying(false);
+    // Was incrementing twice per real pause (accidental duplicate line) —
+    // the same class of bug already found and fixed in the rewatch
+    // counter above. One real pause counted as 2, so a single pause
+    // satisfied ">= 2" and fired immediately: it burned one of the
+    // lesson's 3-use auto-struggle budget and started the 60s
+    // canFireAutoStruggle() cooldown on the very first pause, which
+    // silently blocked every *other* legitimate trigger (rewatch,
+    // fixation/confusion) for the next minute — and could exhaust the
+    // whole budget after just 2 pauses, well before any real gaze-based
+    // confusion had a chance to fire for the rest of the lesson.
+    //
+    // Also previously counted "any 2 pauses anywhere in the lesson,
+    // however far apart" as one struggle signal — pausing once at minute 1
+    // to take a note and once at minute 40 for an unrelated reason isn't
+    // "stuck", but used to combine into a trigger anyway. Mirrors
+    // handleTimeUpdate's own rewatch fix exactly: "repeated" now means
+    // pausing again in the *same* transcript section within a few minutes,
+    // using the actual segment the pause landed in (via
+    // findTranscriptSegmentIndex) rather than a guessed time window —
+    // falls back to a fixed window only for lessons with no transcript.
+    const SAME_SECTION_WINDOW_S = 15; // fallback only — see above
+    const PAUSE_BURST_WINDOW_MS = 3 * 60 * 1000;
+    const now = Date.now();
+    const msSinceLastPause = now - lastPauseAtMsRef.current;
+
+    const segments = lessonRef.current?.transcript || lessonRef.current?.transcript_items || [];
+    const pauseSegmentIdx = findTranscriptSegmentIndex(segments, currentTimeRef.current);
+    const withinBurstWindow = msSinceLastPause <= PAUSE_BURST_WINDOW_MS;
+
+    const isSameSection = lastPauseAtMsRef.current !== 0 && (
+      pauseSegmentIdx >= 0
+        ? lastPauseSegmentRef.current !== null &&
+          Math.abs(pauseSegmentIdx - lastPauseSegmentRef.current) <= 1 &&
+          withinBurstWindow
+        : lastPauseAtSecRef.current !== null &&
+          Math.abs(currentTimeRef.current - lastPauseAtSecRef.current) <= SAME_SECTION_WINDOW_S &&
+          withinBurstWindow
+    );
+
+    pauseCountRef.current = isSameSection ? pauseCountRef.current + 1 : 1;
+    lastPauseSegmentRef.current = pauseSegmentIdx >= 0 ? pauseSegmentIdx : null;
+    lastPauseAtSecRef.current = currentTimeRef.current;
+    lastPauseAtMsRef.current = now;
+
+    // Auto-detect on pause threshold (≥2 pauses in the same section)
+    if (pauseCountRef.current >= 2 && canFireAutoStruggle()) {
+      // Same capture-before-reset fix as handleTimeUpdate's rewatch check —
+      // see detectStruggleRef's own comment: this used to always send 0
+      // for pause_count, so the backend could never classify this as
+      // "pause_frequent" and always fell back to "general_confusion".
+      const firedPauseCount = pauseCountRef.current;
+      markAutoStruggleFired();
+      // Re-arm — see the matching comment in handleTimeUpdate's rewatch
+      // check: without this, the next pause in this same section would
+      // also satisfy ">= 2" and keep re-triggering, even normal pausing.
+      pauseCountRef.current = 0;
+      lastPauseSegmentRef.current = null;
+      lastPauseAtSecRef.current = null;
+      detectStruggleRef.current?.({ idleSeconds: 0, pauseCount: firedPauseCount });
+    }
+    // Start 2-minute inactivity timer
+    idleStartRef.current = Date.now();
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    inactivityTimerRef.current = setTimeout(() => {
+      inactivityTimerRef.current = null;
+      const idleSecs = Math.round((Date.now() - (idleStartRef.current ?? Date.now())) / 1000);
+      if (canFireAutoStruggle()) {
+        markAutoStruggleFired();
+        detectStruggleRef.current?.({ idleSeconds: idleSecs });
+      }
+    }, 120_000);
+  }, [canFireAutoStruggle, markAutoStruggleFired]);
+  const selectChapter = id => setActiveChapter(id);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = parseFloat(speed);
+    }
+  }, [speed]);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-stone-950 flex items-center justify-center text-stone-100">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 text-teal-500 animate-spin" />
-          <p className="text-stone-400 font-medium">Connecting video streaming feeds...</p>
+      <div className="lesson-player" data-theme={theme}>
+        <div className="lesson-player__header">
+          <div className="lesson-player__header-left">
+            <button className="button button--text button--back" onClick={() => navigate(-1)} type="button">
+              ← Back
+            </button>
+            <div>
+              <p className="lesson-player__eyebrow">Lesson player</p>
+              <h1>Loading lesson…</h1>
+            </div>
+          </div>
+        </div>
+        <div className="lesson-player__content">
+          <LoadingState message={`Fetching lesson content for ID ${lessonId || 'unknown'}.`} />
         </div>
       </div>
     );
   }
 
-  if (error || !lesson) {
+  if (error) {
     return (
-      <div className="min-h-screen bg-stone-950 flex items-center justify-center text-stone-100 p-4">
-        <div className="max-w-md bg-stone-900 border border-stone-800 p-8 rounded-2xl text-center shadow-lg">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Error Loading Lesson</h3>
-          <p className="text-stone-400 mb-6">{error || "Requested lesson could not be loaded."}</p>
-          <button onClick={() => navigate('/dashboard')} className="px-5 py-2.5 bg-teal-700 text-white rounded-lg hover:bg-teal-800 transition-colors">
-            Back to Dashboard
-          </button>
+      <div className="lesson-player" data-theme={theme}>
+        <div className="lesson-player__header">
+          <div className="lesson-player__header-left">
+            <button className="button button--text button--back" onClick={() => navigate(-1)} type="button">
+              ← Back
+            </button>
+            <div>
+              <p className="lesson-player__eyebrow">Lesson player</p>
+              <h1>Lesson unavailable</h1>
+            </div>
+          </div>
+        </div>
+        <div className="lesson-player__content">
+          <ErrorState 
+            title="Invalid Lesson" 
+            message={error} 
+            onRetry={() => navigate('/dashboard')} 
+          />
         </div>
       </div>
     );
   }
-
-  const defaultVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
 
   return (
-    <div className="min-h-screen bg-stone-950 flex flex-col font-sans text-stone-100 h-screen overflow-hidden">
-      
-      {/* Top Bar */}
-      <header className="h-14 bg-stone-900 border-b border-stone-800 flex items-center justify-between px-4 shrink-0 shadow-sm relative z-40">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 text-stone-400 hover:text-white rounded-lg hover:bg-stone-800 transition-colors outline-none">
-            <ChevronLeft className="w-5 h-5" />
+      <div className="lesson-player" data-theme={theme}>
+      <div className="lesson-player__header flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <div className="lesson-player__header-left flex items-start gap-4">
+          <button className="button button--text button--back shrink-0 mt-1" onClick={() => navigate(-1)} type="button" aria-label="Go back">
+            ← Back
           </button>
           <div>
-            <div className="text-[10px] font-semibold text-stone-500 uppercase tracking-widest mb-0.5">
-              {dsaData ? "Data Structures & Algorithms" : "Thermodynamics Syllabus"}
+            <div className="flex items-center gap-3">
+              <p className="lesson-player__eyebrow mb-0">Lesson player</p>
             </div>
-            <h1 className="text-sm font-medium text-stone-100 flex items-center gap-2">
-              {lesson.title}
-              <span className="text-[10px] bg-stone-800 text-stone-400 px-1.5 py-0.5 rounded uppercase tracking-wider font-semibold">Order {lesson.order}</span>
-            </h1>
+            <h1 className="text-2xl font-bold text-stone-900 leading-tight mt-1 mb-1">{displayLesson.title || 'Lesson player'}</h1>
+            {(displayLesson.course || displayLesson.module) && (
+              <p className="lesson-player__subline text-stone-500 font-medium">
+                {[displayLesson.course, displayLesson.module].filter(Boolean).join(' → ')}
+              </p>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={triggerStruggle} 
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-md transition-colors focus:outline-none"
-          >
-            <BrainCircuit className="w-3.5 h-3.5" /> Simulate Struggle
+
+        <div className="lesson-player__actions flex flex-wrap items-center gap-2 sm:gap-3">
+          <GazeStatusPill 
+            trackingState={trackingState}
+            attentionState={attentionState}
+            isTrackingEnabled={isTrackingEnabled}
+            onEnableTracking={() => {
+              setShowLivePreview(true);
+              startTracking();
+            }}
+            onCalibrate={startCalibration}
+          />
+          {isTrackingEnabled && !showLivePreview && (
+            <button 
+              className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold rounded-xl transition-colors focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:outline-none" 
+              type="button" 
+              onClick={() => setShowLivePreview(true)}
+              aria-label="Show live preview"
+            >
+              Show Camera
+            </button>
+          )}
+          <button className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold rounded-xl transition-colors focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:outline-none" type="button" onClick={onManualMentor}>
+            Ask mentor
           </button>
-          <div className="text-[11px] font-medium text-stone-400 mr-2 items-center hidden sm:flex bg-stone-800/50 pl-2 pr-3 py-1 rounded-full border border-stone-700/50">
-            <span className="w-1.5 h-1.5 rounded-full bg-teal-500 mr-2 animate-pulse"></span>
-            Monitoring Active
-          </div>
-          <button 
-            onClick={() => setShowMentor(!showMentor)}
-            aria-expanded={showMentor}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all border outline-none focus:ring-2 focus:ring-teal-500 ${
-              showMentor ? 'bg-teal-900/30 text-teal-400 border-teal-800/50 shadow-inner' : 'bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-700'
-            }`}
-          >
-            <BrainCircuit className={`w-4 h-4 ${showMentor ? 'text-teal-400' : 'text-stone-400'}`} /> Mentor
+          <button className="px-4 py-2 bg-[var(--primary)] hover:opacity-90 text-white font-semibold rounded-xl transition-opacity focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 focus-visible:outline-none" type="button" onClick={handleMarkComplete}>
+            Mark complete
+          </button>
+          <button className="p-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl transition-colors focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:outline-none" onClick={toggle} aria-label="Toggle theme">
+            {theme === 'light' ? '🌙' : '☀️'}
           </button>
         </div>
-      </header>
+      </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Main Learning Region */}
-        <div className="flex-1 flex flex-col bg-stone-950 relative overflow-hidden">
-          
-          {/* Struggle Intervention Overlay */}
-          {interventionActive && (
-            <div className="absolute inset-0 bg-stone-950/85 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-300">
-              <div className="bg-stone-50 text-stone-900 p-8 rounded-2xl max-w-md shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-stone-200/50 animate-in zoom-in-95 duration-300">
-                <div className="flex items-center gap-4 mb-5">
-                  <div className="w-12 h-12 rounded-full bg-teal-100 flex items-center justify-center shrink-0 shadow-inner border border-teal-200/50">
-                    <BrainCircuit className="w-6 h-6 text-teal-700" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-lg text-stone-900 leading-tight">Paused for Clarity</h3>
-                    <p className="text-sm text-stone-500 font-medium">Concept struggle detected</p>
-                  </div>
-                </div>
-
-                {isHintLoading ? (
-                  <div className="flex justify-center py-6">
-                    <Loader2 className="w-8 h-8 text-teal-700 animate-spin" />
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-stone-700 leading-relaxed mb-6 text-[15px]">
-                      {mentorHint || "Would you like a simpler breakdown before we continue?"}
-                    </p>
-                    <div className="space-y-2.5">
-                      <button 
-                        onClick={() => {
-                          setInterventionActive(false);
-                          if (dsaData) {
-                            setStudyTimerActive(true);
-                          } else {
-                            if (videoRef.current) {
-                              videoRef.current.play().catch(() => {});
-                              setIsPlaying(true);
-                            }
-                          }
-                        }} 
-                        className="w-full py-3 rounded-xl border border-stone-200 text-stone-700 font-semibold text-sm hover:bg-stone-100 transition-colors flex items-center justify-center gap-2 outline-none focus:ring-2 focus:ring-teal-500 shadow-sm"
-                      >
-                         Resume Lesson <Play className="w-4 h-4 text-stone-500 fill-current" />
-                      </button>
-                      
-                      <div className="grid grid-cols-2 gap-2.5">
-                         <button onClick={() => handleHintRequest('analogy')} className="w-full py-2.5 rounded-xl bg-white border border-stone-200 text-stone-700 font-medium text-xs hover:bg-stone-50 transition-colors shadow-sm outline-none">
-                           Use Analogy
-                         </button>
-                         <button onClick={() => handleHintRequest('hinglish')} className="w-full py-2.5 rounded-xl bg-white border border-stone-200 text-stone-700 font-medium text-xs hover:bg-stone-50 transition-colors shadow-sm outline-none">
-                           Explain in Hinglish
-                         </button>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
+      {showOverlay && (
+        <InterventionOverlay
+          lessonTitle={displayLesson.title}
+          severity={getInterventionSeverity(struggleEvent)}
+          reasonText={struggleReasonText}
+          onResume={() => setShowOverlay(false)}
+          onHint={() => { setShowOverlay(false); setMentorOpen(true); handleGetHintRef.current?.('basic'); }}
+          onExplain={() => { setShowOverlay(false); setMentorOpen(true); handleGetHintRef.current?.('example'); }}
+          onHinglish={() => { setShowOverlay(false); setMentorOpen(true); handleGetHintRef.current?.('detailed', null, 'hinglish'); }}
+          onReplay={() => {
+            setShowOverlay(false);
+            const seekTo = Math.max(0, currentTimeRef.current - 30);
+            if (videoRef.current?.seekTo) videoRef.current.seekTo(seekTo);
+            else if (videoRef.current) videoRef.current.currentTime = seekTo;
+          }}
+          onExpand={() => setMentorOpen(true)}
+        />
+      )}
+      <div className="lesson-player__layout">
+        <main className="lesson-player__main" ref={mainContainerRef}>
+          <section className="card video-card">
+            <div className="video-card__frame video-player-wrapper" id="video-player-container">
+              <VideoPlayer
+                src={displayLesson.videoUrl}
+                videoRef={videoRef}
+                speed={speed}
+                initialTime={progress?.watched_seconds || 0}
+                onPlay={handlePlay}
+                onPause={handlePause}
+                onTimeUpdate={handleTimeUpdate}
+                onDurationChange={handleDurationChange}
+              />
             </div>
-          )}
-
-          {dsaData ? (
-            /* DSA Question practice workspace layout */
-            <div className="flex-1 flex flex-col p-4 sm:p-6 overflow-y-auto space-y-6">
-              {/* Optional embedded YouTube video */}
-              {lesson.video_url && getYouTubeEmbedUrl(lesson.video_url) ? (
-                <div className="w-full max-w-4xl mx-auto aspect-video bg-stone-900 border border-stone-800 rounded-xl overflow-hidden shadow-xl shrink-0">
-                  <iframe
-                    src={`${getYouTubeEmbedUrl(lesson.video_url)}?enablejsapi=1`}
-                    className="w-full h-full border-0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    title={lesson.title}
-                  ></iframe>
-                </div>
-              ) : null}
-
-              {/* Course navigation and main DSA metadata */}
-              <div className="max-w-4xl w-full mx-auto bg-stone-900/45 border border-stone-850 rounded-2xl p-6 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-4 mb-4 border-b border-stone-850 pb-4">
-                  <div className="flex items-center gap-3">
-                    <span className="bg-stone-850 text-stone-300 text-xs px-2.5 py-1 rounded font-medium border border-stone-800">
-                      {dsaData.topic || "DSA"}
-                    </span>
-                    <span className={`text-xs px-2.5 py-1 rounded font-bold uppercase tracking-wider ${
-                      dsaData.difficulty.toLowerCase() === 'easy' ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-800/50' :
-                      dsaData.difficulty.toLowerCase() === 'hard' ? 'bg-rose-950/40 text-rose-400 border border-rose-800/50' :
-                      'bg-amber-950/40 text-amber-400 border border-amber-800/50'
-                    }`}>
-                      {dsaData.difficulty}
-                    </span>
-                  </div>
-                  
-                  {/* Timer & Mark as Completed */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 text-xs text-stone-400 font-medium bg-stone-800/50 px-3 py-1.5 rounded-lg border border-stone-750">
-                      <Clock className="w-3.5 h-3.5 text-teal-400" />
-                      <span>{formatTime(currentTime)} / {formatTime(duration)}</span>
-                    </div>
-                    {currentTime >= duration ? (
-                      <span className="flex items-center gap-1 text-xs font-bold text-emerald-400 bg-emerald-950/30 px-3 py-1.5 rounded-lg border border-emerald-900/50">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Completed
-                      </span>
-                    ) : (
-                      <button 
-                        onClick={async () => {
-                          try {
-                            await api.progress.update(lesson.id, duration, 100, true);
-                            setCurrentTime(duration);
-                            setStudyTimerActive(false);
-                          } catch (err) {
-                            console.error(err);
-                          }
-                        }}
-                        className="bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow transition-colors"
-                      >
-                        Mark as Completed
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Helpful resources Links */}
-                <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-stone-400 font-medium mb-6">
-                  {dsaData.leetcode && (
-                    <a href={dsaData.leetcode} target="_blank" rel="noopener noreferrer" className="hover:text-teal-400 transition-colors flex items-center gap-1">
-                      <FileText className="w-3.5 h-3.5 text-stone-500" /> LeetCode
-                    </a>
-                  )}
-                  {dsaData.tuf && (
-                    <a href={dsaData.tuf} target="_blank" rel="noopener noreferrer" className="hover:text-teal-400 transition-colors flex items-center gap-1">
-                      <Sparkles className="w-3.5 h-3.5 text-stone-500" /> TUF+ Editorial
-                    </a>
-                  )}
-                  {dsaData.article && (
-                    <a href={dsaData.article} target="_blank" rel="noopener noreferrer" className="hover:text-teal-400 transition-colors flex items-center gap-1">
-                      <HelpCircle className="w-3.5 h-3.5 text-stone-500" /> Full Editorial
-                    </a>
-                  )}
-                </div>
-
-                {/* Dynamic Tab Toggle (Problem vs Solutions) */}
-                <div className="flex border-b border-stone-850 mb-6 bg-stone-900/80 p-1 rounded-lg">
-                  <button 
-                    onClick={() => setActiveDsaTab("problem")}
-                    className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${
-                      activeDsaTab === 'problem' 
-                        ? 'bg-stone-850 text-white shadow' 
-                        : 'text-stone-400 hover:text-white'
-                    }`}
-                  >
-                    Problem Statement
-                  </button>
-                  <button 
-                    onClick={() => setActiveDsaTab("approaches")}
-                    className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${
-                      activeDsaTab === 'approaches' 
-                        ? 'bg-stone-850 text-white shadow' 
-                        : 'text-stone-400 hover:text-white'
-                    }`}
-                  >
-                    Approaches & Solutions ({dsaData.approaches.length})
-                  </button>
-                </div>
-
-                {/* Tab Contents */}
-                {activeDsaTab === 'problem' ? (
-                  <div className="text-stone-300 font-normal leading-relaxed p-2 bg-stone-900/10 rounded-xl max-h-[500px] overflow-y-auto">
-                    {renderMarkdownContent(dsaData.problemStatement)}
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {/* Approach Horizontal Tabs */}
-                    <div className="flex flex-wrap gap-2">
-                      {dsaData.approaches.map((app, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => {
-                            setActiveApproachIdx(idx);
-                            const availableLangs = Object.keys(app.codes);
-                            if (availableLangs.length > 0 && !availableLangs.includes(activeLanguage)) {
-                              setActiveLanguage(availableLangs[0]);
-                            }
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                            activeApproachIdx === idx
-                              ? 'bg-teal-950 text-teal-400 border-teal-850'
-                              : 'bg-stone-850 hover:bg-stone-800 text-stone-400 border-stone-800'
-                          }`}
-                        >
-                          {app.name}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Active Approach Content */}
-                    {dsaData.approaches[activeApproachIdx] && (
-                      <div className="space-y-4">
-                        {/* Time & Space Complexity Badges */}
-                        <div className="flex flex-wrap gap-3">
-                          {dsaData.approaches[activeApproachIdx].timeComplexity && (
-                            <div className="bg-teal-950/20 border border-teal-900 rounded-xl px-3 py-1.5 flex items-center gap-2">
-                              <span className="text-[10px] font-bold text-teal-500 uppercase tracking-wider">Time</span>
-                              <span className="text-xs font-semibold text-teal-300 font-mono">
-                                {dsaData.approaches[activeApproachIdx].timeComplexity}
-                              </span>
-                            </div>
-                          )}
-                          {dsaData.approaches[activeApproachIdx].spaceComplexity && (
-                            <div className="bg-indigo-950/20 border border-indigo-900 rounded-xl px-3 py-1.5 flex items-center gap-2">
-                              <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Space</span>
-                              <span className="text-xs font-semibold text-indigo-300 font-mono">
-                                {dsaData.approaches[activeApproachIdx].spaceComplexity}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Extra complexity detail texts if present */}
-                        {dsaData.approaches[activeApproachIdx].complexityText && (
-                          <div className="text-xs text-stone-400 leading-relaxed font-normal bg-stone-950/40 p-3 rounded-lg border border-stone-850/50">
-                            {renderMarkdownContent(dsaData.approaches[activeApproachIdx].complexityText)}
-                          </div>
-                        )}
-
-                        {/* Code editor view tab selector */}
-                        {Object.keys(dsaData.approaches[activeApproachIdx].codes).length > 0 ? (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between border-b border-stone-850 pb-2">
-                              <div className="flex gap-2">
-                                {Object.keys(dsaData.approaches[activeApproachIdx].codes).map((lang) => (
-                                  <button
-                                    key={lang}
-                                    onClick={() => setActiveLanguage(lang)}
-                                    className={`px-2.5 py-1 text-xs rounded font-semibold transition-all ${
-                                      activeLanguage === lang
-                                        ? 'bg-stone-850 text-teal-400'
-                                        : 'text-stone-500 hover:text-stone-300'
-                                    }`}
-                                  >
-                                    {lang}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Code Container */}
-                            <div className="relative rounded-xl overflow-hidden border border-stone-800 bg-stone-900 shadow-lg">
-                              <div className="flex items-center justify-between px-4 py-2 bg-stone-950 border-b border-stone-850 text-xs text-stone-400">
-                                <span className="font-mono text-teal-400 flex items-center gap-1.5">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse"></span>
-                                  solution.{activeLanguage.toLowerCase() === 'javascript' ? 'js' : activeLanguage.toLowerCase() === 'python' ? 'py' : activeLanguage.toLowerCase()}
-                                </span>
-                                <button 
-                                  onClick={() => handleCopyCode(dsaData.approaches[activeApproachIdx].codes[activeLanguage])} 
-                                  className="hover:text-white transition-colors flex items-center gap-1 bg-stone-850 hover:bg-stone-800 px-2 py-1 rounded"
-                                >
-                                  {copySuccess ? "Copied!" : "Copy Code"}
-                                </button>
-                              </div>
-                              <div className="overflow-x-auto p-4 font-mono text-xs text-stone-200 leading-relaxed max-h-[300px] overflow-y-auto select-text bg-stone-950/20">
-                                <pre className="whitespace-pre">
-                                  {dsaData.approaches[activeApproachIdx].codes[activeLanguage]}
-                                </pre>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-xs text-stone-500 italic">No code solutions found for this approach.</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            /* Traditional Video Player Layout */
-            <div className="flex-1 relative flex items-center justify-center p-4 sm:p-8 bg-black">
-              <div className="w-full max-w-5xl aspect-video bg-stone-900 border border-stone-800 rounded-xl overflow-hidden relative shadow-2xl transition-all duration-300 ring-1 ring-white/5">
-                
-                {lesson.video_url || defaultVideoUrl ? (
-                  <video
-                    ref={videoRef}
-                    src={lesson.video_url || defaultVideoUrl}
-                    className="w-full h-full object-contain"
-                    onTimeUpdate={handleTimeUpdate}
-                    onDurationChange={(e) => setDuration(e.target.duration)}
-                    onEnded={handleVideoEnded}
-                    onClick={handlePlayPause}
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none">
-                    <span className="text-stone-600 tracking-widest text-xs font-semibold uppercase">LECTURE STREAMING</span>
-                  </div>
-                )}
-
-                {/* Video Controls Footer */}
-                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent pt-16 pb-5 px-6 z-10 flex flex-col pointer-events-auto">
-                  <input 
-                    type="range"
-                    min={0}
-                    max={duration || 100}
-                    value={currentTime}
-                    onChange={handleTimelineChange}
-                    className="w-full h-[5px] bg-stone-700/50 rounded-full mb-5 cursor-pointer accent-teal-500 hover:h-2 transition-all"
-                  />
-                  
-                  <div className="flex items-center justify-between text-stone-300">
-                    <div className="flex items-center gap-5">
-                      <button onClick={handlePlayPause} className="hover:text-teal-400 transition-colors outline-none">
-                        {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
-                      </button>
-                      <button onClick={() => { if (videoRef.current) videoRef.current.currentTime = Math.max(0, currentTime - 10) }} className="hover:text-white transition-colors outline-none">
-                        <SkipBack className="w-5 h-5 fill-current" />
-                      </button>
-                      <div className="flex items-center gap-1.5 text-sm font-medium tracking-wide">
-                        <span className="text-white">{formatTime(currentTime)}</span>
-                        <span className="text-stone-500">/</span>
-                        <span className="text-stone-400">{formatTime(duration)}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-5">
-                      <button className="hover:text-white transition-colors outline-none"><Volume2 className="w-5 h-5" /></button>
-                      <button className="hover:text-white transition-colors outline-none"><Maximize className="w-5 h-5" /></button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right Side Stack: Mentor & Transcripts */}
-        <div 
-           className={`bg-white text-stone-900 border-l border-stone-200 flex flex-col shrink-0 transition-all duration-300 shadow-[-10px_0_30px_rgba(0,0,0,0.3)] z-30
-           ${showMentor ? 'w-80 md:w-96 translate-x-0' : 'w-0 translate-x-full border-none'}`}
-        >
-          {/* AI Mentor Persistent Header Panel */}
-          <div className={`bg-stone-50 border-b border-stone-200 shrink-0 flex flex-col h-3/5 overflow-hidden`}>
             
-            {/* Header */}
-            <div className="h-14 px-4 flex items-center justify-between border-b border-stone-100 bg-white shadow-sm z-10 shrink-0">
-               <div className="flex items-center gap-2">
-                 <div className="w-7 h-7 rounded bg-teal-100 flex items-center justify-center border border-teal-200/50">
-                    <Bot className="w-4 h-4 text-teal-700" />
-                 </div>
-                 <span className="text-sm font-semibold text-stone-800 tracking-tight">AI Mentor Feed</span>
-               </div>
+            {/* Visual Progression Bar beneath video */}
+            <div className="w-full h-1.5 bg-stone-200 dark:bg-stone-800 overflow-hidden shrink-0">
+              <div 
+                className="h-full bg-[var(--primary)] transition-[width] duration-300 ease-out" 
+                style={{ width: `${Math.max(0, Math.min(100, lessonProgress || 0))}%` }} 
+              />
             </div>
+          </section>
 
-            {/* Chat Content */}
-            <div className="flex-1 flex flex-col p-4 overflow-hidden bg-stone-50/50">
-              <div className="flex-1 overflow-y-auto space-y-4 pr-1 custom-scrollbar text-sm">
-                 {chatMessages.map((msg, i) => (
-                   <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                     <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${msg.role === 'user' ? 'bg-stone-200' : 'bg-teal-100'}`}>
-                       {msg.role === 'user' ? (
-                         <span className="text-[10px] font-bold text-stone-500">ME</span>
-                       ) : (
-                         <Bot className="w-3.5 h-3.5 text-teal-700" />
-                       )}
-                     </div>
-                     <div className={`p-3 rounded-2xl shadow-sm text-stone-700 leading-relaxed font-medium ${msg.role === 'user' ? 'bg-teal-700 text-white rounded-tr-none' : 'bg-white rounded-tl-none border border-stone-200'}`}>
-                       {msg.text}
-                     </div>
-                   </div>
-                 ))}
-              </div>
-              
-              {/* Input Area */}
-              <form onSubmit={handleSendMessage} className="mt-4 pt-3 border-t border-stone-200 bg-stone-50 shrink-0">
-                <div className="flex gap-2 relative">
-                  <input 
-                    type="text" 
-                    value={userInput}
-                    onChange={(e) => setUserInput(e.target.value)}
-                    placeholder="Ask the mentor..." 
-                    className="flex-1 bg-white border border-stone-300 rounded-lg pl-3 pr-10 py-2.5 text-sm font-medium focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 shadow-sm placeholder:font-normal placeholder:text-stone-400" 
-                  />
-                  <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-teal-700 text-white rounded-md flex items-center justify-center hover:bg-teal-800 transition-colors shadow-sm">
-                    <ChevronLeft className="w-4 h-4 rotate-180" />
-                  </button>
-                </div>
-              </form>
+          {/* Mobile Camera Preview */}
+          {isTrackingEnabled && showLivePreview && (
+            <div className="sm:hidden mt-4">
+              {/* BUG FIX: was passing onPauseTracking/onDisableTracking/
+                  onTogglePreview — props LiveCameraPreview never destructures
+                  (it reads isTrackingEnabled/onToggleTracking/
+                  onSimulateFixation/onSimulateInactivity, matching the
+                  desktop render further below). This call site never got
+                  updated after that refactor, so on mobile the toggle
+                  switch/simulate buttons were dead — clicking them did
+                  nothing — and isTrackingEnabled being unset here forced
+                  the component into its permanent "Off" visual state
+                  regardless of real tracking status. Now matches the
+                  desktop call site's API. */}
+              <LiveCameraPreview
+                stream={stream}
+                trackingState={trackingState}
+                attentionState={attentionState}
+                isCalibrated={isCalibrated}
+                isTrackingEnabled={isTrackingEnabled}
+                onToggleTracking={() => {
+                  if (isTrackingEnabled) {
+                    stopTracking();
+                    setShowLivePreview(false);
+                  } else {
+                    startTracking();
+                  }
+                }}
+                onStartCalibration={startCalibration}
+                onSimulateFixation={() => detectStruggleRef.current?.({ isManual: false, fixationMs: 8000, inactivityMs: 0, idleSeconds: 0 })}
+                onSimulateInactivity={() => detectStruggleRef.current?.({ isManual: false, fixationMs: 0, inactivityMs: 60000, idleSeconds: 60 })}
+              />
             </div>
-          </div>
+          )}
 
-          {/* Tertiary View: Transcript/Notes */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-white">
-            <div className="flex items-center border-b border-stone-100 bg-stone-50/50 shrink-0 px-2 pt-2">
+          {/* Learning Tabs */}
+          <section className="learning-tabs hidden sm:flex flex-col tabs-container">
+            <div className="learning-tabs__header">
               <button 
+                className={`learning-tab__button ${activeTab === 'transcript' ? 'learning-tab__button--active' : ''}`}
                 onClick={() => setActiveTab('transcript')}
-                className={`px-4 py-2.5 text-[13px] font-semibold flex items-center justify-center gap-1.5 transition-colors border-b-2 ${activeTab === 'transcript' ? 'border-teal-700 text-teal-800' : 'border-transparent text-stone-500'}`}
               >
-                <FileText className="w-3.5 h-3.5" /> Transcript
+                Transcript
               </button>
               <button 
+                className={`learning-tab__button ${activeTab === 'notes' ? 'learning-tab__button--active' : ''}`}
                 onClick={() => setActiveTab('notes')}
-                className={`px-4 py-2.5 text-[13px] font-semibold flex items-center justify-center gap-1.5 transition-colors border-b-2 ${activeTab === 'notes' ? 'border-teal-700 text-teal-800' : 'border-transparent text-stone-500'}`}
               >
-                <Type className="w-3.5 h-3.5" /> Notes
+                Notes
+              </button>
+              <button 
+                className={`learning-tab__button ${activeTab === 'resources' ? 'learning-tab__button--active' : ''}`}
+                onClick={() => setActiveTab('resources')}
+              >
+                Resources
               </button>
             </div>
-
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+            
+            <div className="learning-tabs__content p-4 h-[400px] active-content">
               {activeTab === 'transcript' && (
-                <div className="space-y-1">
-                  <p className="text-[13px] text-stone-600 leading-relaxed hover:bg-stone-50 p-2.5 rounded-lg cursor-pointer transition-colors group">
-                    <span className="font-bold text-teal-700/60 group-hover:text-teal-700 w-10 inline-block">00:15</span>
-                    Welcome to the syllabus. Today we cover fundamental thermodynamic laws.
-                  </p>
-                  <p className="text-[13px] text-stone-900 leading-relaxed bg-teal-50/50 p-2.5 rounded-r-lg font-medium border-l-[3px] border-teal-500 shadow-sm relative">
-                    <span className="font-bold text-teal-800 w-10 inline-block">01:30</span>
-                    Let's review energy distributions and particle arrangements in a closed container.
-                  </p>
-                  <p className="text-[13px] text-stone-600 leading-relaxed hover:bg-stone-50 p-2.5 rounded-lg cursor-pointer transition-colors group">
-                    <span className="font-bold text-stone-400 w-10 inline-block">05:45</span>
-                    Observe heat capacity capacity variations under constant volume vs constant pressure.
-                  </p>
+                <div className="h-full relative overflow-hidden flex flex-col transcript-container" id="transcript-panel">
+                  <TranscriptPanel 
+                    segments={transcriptItems} 
+                    currentTime={progress?.watched_seconds || 0} 
+                    onSeek={handleSeek} 
+                  />
                 </div>
               )}
               {activeTab === 'notes' && (
-                <textarea 
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full h-full resize-none border px-3 py-3 rounded-lg border-stone-200 outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-[13px] text-stone-700 leading-relaxed bg-stone-50/30 placeholder:text-stone-400" 
-                  placeholder="Take notes here. They will be automatically timestamped..."
-                ></textarea>
+                <PersonalNotesPanel lessonId={lessonId} className="p-2" />
+              )}
+              {activeTab === 'resources' && (
+                <StudyMaterialPanel
+                  lessonId={lessonId}
+                  pdfFilename={lesson?.pdf_filename}
+                  notesContent={lesson?.notes_content}
+                  isOwner={!!lesson?.is_owner}
+                  onLessonUpdate={handleLessonUpdate}
+                />
               )}
             </div>
+          </section>
+
+          {/* Mobile Tab Content (conditionally shown) */}
+          <section className="learning-tabs flex sm:hidden flex-col mt-4 tabs-container">
+            <div className="learning-tabs__content p-4 h-[400px] active-content">
+              {activeTab === 'transcript' && (
+                <div className="h-full relative overflow-hidden flex flex-col transcript-container" id="transcript-panel">
+                  <TranscriptPanel
+                    segments={transcriptItems}
+                    currentTime={progress?.watched_seconds || 0}
+                    onSeek={handleSeek}
+                  />
+                </div>
+              )}
+
+              {activeTab === 'notes' && (
+                <PersonalNotesPanel lessonId={lessonId} placeholder="Type your notes here..." className="p-2" />
+              )}
+
+              {activeTab === 'resources' && (
+                <StudyMaterialPanel
+                  lessonId={lessonId}
+                  pdfFilename={lesson?.pdf_filename}
+                  notesContent={lesson?.notes_content}
+                  isOwner={!!lesson?.is_owner}
+                  onLessonUpdate={handleLessonUpdate}
+                />
+              )}
+              
+              {activeTab === 'mentor' && (
+                <div className="h-full mentor-chat" id="mentor-panel">
+                  <MentorPanel
+                    isOpen={true}
+                    isStruggle={showOverlay}
+                    isAutoDetected={isAutoDetected}
+                    reasonText={struggleReasonText}
+                    hints={hints}
+                    hintLoading={hintLoading}
+                    onGetHint={onGetHint}
+                    onClose={() => setActiveTab('transcript')}
+                    onExpand={() => {}}
+                    onUnderstood={() => { setShowOverlay(false); }}
+                  />
+                </div>
+              )}
+            </div>
+          </section>
+        </main>
+
+        <aside className="lesson-player__sidebar hidden sm:block flex-col gap-4">
+          {wsStatus === 'disconnected' && (
+            <div className="bg-red-50 text-red-700 p-3 rounded-xl mb-4 text-sm font-medium flex items-center justify-between border border-red-100">
+              <span>Live connection lost. Some features may be delayed.</span>
+              <button onClick={() => window.location.reload()} className="text-xs bg-white px-2 py-1 rounded border border-red-200 hover:bg-red-50 transition-colors focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none">
+                Retry
+              </button>
+            </div>
+          )}
+          
+          {/* ── AI Mentor Panel ─────────────────────────────────────── */}
+          <div className="hidden sm:flex flex-col gap-3 mentor-chat" id="mentor-panel">
+            <MentorPanel
+              isOpen={mentorOpen}
+              isStruggle={showOverlay}
+              isAutoDetected={isAutoDetected}
+              reasonText={struggleReasonText}
+              hints={hints}
+              hintLoading={hintLoading}
+              onGetHint={onGetHint}
+              onClose={() => setMentorOpen(false)}
+              onExpand={() => setMentorOpen(true)}
+              onUnderstood={() => { setShowOverlay(false); }}
+            />
           </div>
 
-        </div>
+          {/* Desktop Camera Preview */}
+          <div className="mb-4">
+            <LiveCameraPreview
+              stream={stream}
+              trackingState={trackingState}
+              attentionState={attentionState}
+              isCalibrated={isCalibrated}
+              isTrackingEnabled={isTrackingEnabled}
+              onToggleTracking={() => {
+                if (isTrackingEnabled) {
+                  stopTracking();
+                } else {
+                  startTracking();
+                }
+              }}
+              onStartCalibration={startCalibration}
+              onSimulateFixation={() => detectStruggleRef.current?.({ isManual: false, fixationMs: 8000, inactivityMs: 0, idleSeconds: 0 })}
+              onSimulateInactivity={() => detectStruggleRef.current?.({ isManual: false, fixationMs: 0, inactivityMs: 60000, idleSeconds: 60 })}
+            />
+          </div>
+
+        </aside>
       </div>
-      
-      <style dangerouslySetInnerHTML={{__html: `
-      .custom-scrollbar::-webkit-scrollbar { width: 5px; }
-      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-      .custom-scrollbar::-webkit-scrollbar-thumb { background: #e7e5e4; border-radius: 10px; }
-      .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #d6d3d1; }
-      `}} />
+
+      <div className="lesson-player__mobile-bar sm:hidden">
+        <button 
+          type="button" 
+          className={`button ${activeTab === 'transcript' ? 'button--primary' : 'button--muted'} button--full`} 
+          onClick={() => setActiveTab('transcript')}
+        >
+          Transcript
+        </button>
+        <button 
+          type="button" 
+          className={`button ${activeTab === 'mentor' ? 'button--primary' : 'button--muted'} button--full relative`} 
+          onClick={() => setActiveTab('mentor')}
+        >
+          AI Mentor
+          {hints.length > 0 && activeTab !== 'mentor' && (
+            <span className="absolute top-0 right-0 -mt-1 -mr-1 flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
+            </span>
+          )}
+        </button>
+        <button 
+          type="button" 
+          className={`button ${activeTab === 'notes' ? 'button--primary' : 'button--muted'} button--full`} 
+          onClick={() => setActiveTab('notes')}
+        >
+          Notes
+        </button>
+      </div>
     </div>
   );
 }

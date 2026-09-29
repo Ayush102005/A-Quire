@@ -45,7 +45,7 @@ async def update_notification(
     if not notification or notification.user_id != current_user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Notification not found.")
     notification.is_read = body.is_read
-    await db.flush()
+    await db.commit()
     return notification
 
 

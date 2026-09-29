@@ -178,7 +178,7 @@ export default function ForgotPassword() {
   ].join(' ');
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center px-4 py-12 font-sans">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12 font-sans" style={{backgroundColor:'var(--bg)'}}>
 
       {/* ── Background texture layer ── */}
       <div

@@ -2,44 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   BookOpen, ChevronDown, ChevronRight, Volume2, CheckCircle2,
   Loader2, ChevronUp, Lightbulb, Layers, AlignLeft, Send,
-  Sparkles, RotateCcw,
+  Sparkles, RotateCcw, VolumeX,
 } from 'lucide-react';
+import { renderLiteMarkdown } from '../../utils/renderLiteMarkdown';
 
-// ─── Data ────────────────────────────────────────────────────────────────────
-
-const CONTEXT = {
-  concept: "Boltzmann's Formula",
-  why: "The system noticed several pauses near this segment. This is one of the most conceptually dense points in the lesson — that's normal.",
-};
-
-const HINTS = [
-  {
-    level: 1,
-    label: 'Hint 1',
-    tone: 'Gentle nudge',
-    prompt: 'What is Ω counting?',
-    body: 'Try thinking of Ω not as a physical thing, but as a count. If you have 4 molecules in a box, how many distinct arrangements are possible in the left half versus the whole box?',
-    audioLabel: 'Hear Hint 1',
-  },
-  {
-    level: 2,
-    label: 'Hint 2',
-    tone: 'Stronger support',
-    prompt: 'Why does ln appear in the formula?',
-    body: 'Entropy must be additive — combining two systems should add their entropies. But microstates multiply. There is exactly one function that converts multiplication into addition. Which one?',
-    audioLabel: 'Hear Hint 2',
-  },
-];
-
-const ANALOGY = {
-  title: 'Analogy: The Library',
-  body: 'Imagine a library with 1,000 books. There is only one way for all books to be perfectly sorted. But there are millions of ways for them to be "messy". Entropy is that count of messy arrangements — and nature drifts toward mess simply because mess is overwhelmingly more probable.',
-};
-
-const SIMPLE = {
-  title: 'Simpler Explanation',
-  body: 'S = k · ln(Ω) says: entropy is a measure of how many ways a system can be arranged. More arrangements = higher entropy. Systems naturally move toward high entropy states not because of a force, but because high-entropy states are astronomically more likely.',
-};
+// ─── Real-hint card ───────────────────────────────────────────────────────────
+// Renders a hint returned from the AI mentor API
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -69,48 +37,97 @@ function AudioButton({ label, playing, onToggle }) {
   );
 }
 
-function HintCard({ hint, isNew, playingId, onToggleAudio }) {
-  const isPlaying = playingId === hint.level;
+function UserMessageCard({ text }) {
+  return (
+    <div className="flex justify-end mt-2 mb-2">
+      <div className="bg-teal-50 border border-teal-100 rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[85%] shadow-sm">
+        <p className="text-sm text-stone-700 leading-relaxed">{text}</p>
+      </div>
+    </div>
+  );
+}
+
+const LEVEL_LABELS = {
+  basic:    '· Gentle nudge',
+  detailed: '· Deeper guidance',
+  example:  '· Worked example',
+  custom:   '· Your question',
+  quiz:     '· Quiz question',
+  summary:  '· Summary',
+  confused: '· Gentle nudge',
+  analogy:  '· Analogy',
+  simpler:  '· Simpler explanation',
+};
+
+function RealHintCard({ text, index, level, isNew, audioBase64, isMuted }) {
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef(null);
+
+  const playAudio = () => {
+    if (!audioRef.current && audioBase64) {
+      audioRef.current = new Audio(`data:audio/mp3;base64,${audioBase64}`);
+      audioRef.current.onended = () => setPlaying(false);
+    }
+    if (audioRef.current) {
+      audioRef.current.play().then(() => setPlaying(true)).catch(e => console.error("Audio play failed:", e));
+    }
+  };
+
+  const toggleAudio = () => {
+    if (!audioBase64) return;
+    
+    if (playing && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setPlaying(false);
+    } else {
+      playAudio();
+    }
+  };
+
+  useEffect(() => {
+    if (isNew && audioBase64 && !isMuted) {
+      playAudio();
+    }
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isNew, audioBase64]);
+
   return (
     <div
       className={`rounded-xl border bg-white transition-all duration-300 overflow-hidden ${
         isNew ? 'ring-1 ring-teal-300 border-teal-200' : 'border-stone-200'
       }`}
-      aria-label={`${hint.label}: ${hint.prompt}`}
+      aria-label={`Hint ${index + 1}`}
     >
-      {/* Card header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-stone-100 bg-stone-50/60">
         <div className="flex items-center gap-2">
           <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
             isNew ? 'bg-teal-700 text-white' : 'bg-stone-200 text-stone-500'
           }`}>
-            {hint.level}
+            {index + 1}
           </span>
-          <span className="text-xs font-semibold text-stone-700">{hint.label}</span>
-          <span className="text-[10px] text-stone-400 font-medium">· {hint.tone}</span>
+          <span className="text-xs font-semibold text-stone-700">Hint {index + 1}</span>
+          {level && (
+            <span className="text-[10px] text-stone-400 font-medium">
+              {LEVEL_LABELS[level] ?? ''}
+            </span>
+          )}
         </div>
-        <AudioButton
-          label={hint.audioLabel}
-          playing={isPlaying}
-          onToggle={() => onToggleAudio(hint.level)}
-        />
+        {audioBase64 && (
+          <AudioButton
+            label={`Hear Hint ${index + 1}`}
+            playing={playing}
+            onToggle={toggleAudio}
+          />
+        )}
       </div>
-
-      {/* Prompt */}
-      <div className="px-4 pt-3 pb-1">
-        <p className="text-[11px] font-semibold text-teal-700 uppercase tracking-wide mb-1.5">
-          Consider this →
-        </p>
-        <p className="text-sm font-semibold text-stone-800 mb-2 leading-snug">
-          {hint.prompt}
-        </p>
-      </div>
-
-      {/* Body */}
-      <div className="px-4 pb-4">
-        <p className="text-sm text-stone-600 leading-relaxed">
-          {hint.body}
-        </p>
+      <div className="px-4 py-4 text-sm text-stone-700 leading-relaxed space-y-2">
+        {renderLiteMarkdown(text)}
       </div>
     </div>
   );
@@ -147,29 +164,6 @@ function LoadingCard() {
         <div className="h-2 bg-stone-100 rounded-full animate-pulse w-full" />
         <div className="h-2 bg-stone-100 rounded-full animate-pulse w-5/6" />
       </div>
-    </div>
-  );
-}
-
-function SuccessState({ onReset }) {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center py-10 px-4 text-center gap-4">
-      <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center">
-        <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-      </div>
-      <div>
-        <p className="text-sm font-semibold text-stone-800 mb-1">Great — keep going</p>
-        <p className="text-xs text-stone-400 leading-relaxed max-w-[200px] mx-auto">
-          The lesson will resume. Your mentor is still here if you need support later.
-        </p>
-      </div>
-      <button
-        onClick={onReset}
-        className="flex items-center gap-1.5 text-[11px] font-semibold text-stone-400 hover:text-stone-600 transition-colors mt-2"
-        aria-label="Revisit hints"
-      >
-        <RotateCcw className="w-3 h-3" /> Revisit hints
-      </button>
     </div>
   );
 }
@@ -212,15 +206,18 @@ function MinimizedMentor({ isStruggle, onExpand }) {
 // ─── Main Panel ───────────────────────────────────────────────────────────────
 
 export default function MentorPanel({
-  isOpen,
-  isStruggle,
-  onClose,
-  onExpand,
-  onUnderstood,
+  isOpen, isStruggle, isAutoDetected = false,
+  hints = [], hintLoading = false,
+  onGetHint, onClose, onExpand, onUnderstood,
+  // The real reason this was auto-detected (see
+  // InterventionOverlay.jsx's getStruggleReasonText) — null falls back to
+  // the generic copy below, same as before this existed.
+  reasonText = null,
 }) {
   // panel scaffold state
   // 'idle' | 'loading' | 'hint-1' | 'hint-2' | 'success'
-  const [stage, setStage] = useState(isStruggle ? 'idle' : 'idle');
+  const [stage, setStage] = useState('idle');
+  const [isMuted, setIsMuted] = useState(false);
   const [showAnalogy, setShowAnalogy] = useState(false);
   const [showSimple, setShowSimple] = useState(false);
   const [response, setResponse] = useState('');
@@ -228,13 +225,33 @@ export default function MentorPanel({
   const [loadingNext, setLoadingNext] = useState(false);
   const audioTimerRef = useRef(null);
   const bottomRef = useRef(null);
+  const prevHintsLen = useRef(0);
+  
+  const mentorHints = hints.filter(h => typeof h === 'string' || h.role !== 'student');
 
-  // Reset when panel opens fresh on struggle
+  const prevIsOpen = useRef(isOpen);
+
+  // Reset stage whenever the panel transitions from closed → open,
+  // so the user never lands on a stale "success" or loading screen.
   useEffect(() => {
-    if (isOpen && isStruggle && stage === 'idle') {
-      // auto-show first hint after brief pause
+    const wasOpen = prevIsOpen.current;
+    prevIsOpen.current = isOpen;
+    if (isOpen && !wasOpen) {
+      setStage('idle');
+      setShowAnalogy(false);
+      setShowSimple(false);
+      setResponse('');
+      setLoadingNext(false);
     }
-  }, [isOpen, isStruggle]);
+  }, [isOpen]);
+
+  // Reset prevHintsLen when the hints array is externally cleared (new lesson
+  // or "understood" flow), so the stage-advance effect fires correctly again.
+  useEffect(() => {
+    if (hints.length === 0) {
+      prevHintsLen.current = 0;
+    }
+  }, [hints.length]);
 
   // Auto-scroll to bottom when content grows
   useEffect(() => {
@@ -242,6 +259,20 @@ export default function MentorPanel({
       bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
   }, [stage, showAnalogy, showSimple, loadingNext]);
+
+  // Advance stage automatically when a new hint arrives from the API
+  useEffect(() => {
+    if (hints.length > prevHintsLen.current) {
+      prevHintsLen.current = hints.length;
+      setLoadingNext(false);
+      if (stage === 'idle' || stage === 'loading-hint') {
+        setStage('hint-1');
+      } else if (stage === 'hint-1' || stage === 'loading-detail') {
+        setStage('hint-2');
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hints.length]);
 
   const handleToggleAudio = (id) => {
     clearTimeout(audioTimerRef.current);
@@ -251,16 +282,50 @@ export default function MentorPanel({
   };
 
   const advanceStage = (next) => {
+    // Used only as fallback when no onGetHint is wired
     setLoadingNext(true);
-    setTimeout(() => {
-      setLoadingNext(false);
-      setStage(next);
-    }, 1100);
+    setTimeout(() => { setLoadingNext(false); setStage(next); }, 1100);
   };
 
-  const handleFirstHint = () => advanceStage('hint-1');
-  const handleNextHint = () => advanceStage('hint-2');
-  const handleUnderstood = () => { setStage('success'); onUnderstood?.(); };
+  const handleFirstHint = () => {
+    if (onGetHint) {
+      onGetHint('basic');
+      setStage('loading-hint');
+      setLoadingNext(true);
+    } else {
+      advanceStage('hint-1');
+    }
+  };
+
+  const triggerHint = (type) => {
+    if (onGetHint) {
+      onGetHint(type);
+      setStage('loading-hint');
+      setLoadingNext(true);
+    } else {
+      advanceStage('hint-1');
+    }
+  };
+
+  const handleNextHint = () => {
+    if (onGetHint) {
+      onGetHint('detailed');
+      setStage('loading-detail');
+      setLoadingNext(true);
+    } else {
+      advanceStage('hint-2');
+    }
+  };
+  
+  const handleSubmitResponse = () => {
+    if (!response.trim() || !onGetHint) return;
+    onGetHint('custom', response);
+    setResponse('');
+    setStage('loading-detail');
+    setLoadingNext(true);
+  };
+  
+  const handleUnderstood = () => { handleReset(); onUnderstood?.(); };
 
   const handleReset = () => {
     setStage('idle');
@@ -278,7 +343,7 @@ export default function MentorPanel({
   // ── Expanded ─────────────────────────────────────────────────────────────────
   return (
     <aside
-      className="flex flex-col bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden h-full"
+      className="flex flex-col bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden h-[450px] shrink-0"
       aria-label="AI Mentor panel"
       role="complementary"
     >
@@ -286,95 +351,105 @@ export default function MentorPanel({
       {/* ── Panel Header ─────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100 shrink-0 bg-white">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-teal-50 border border-teal-100 flex items-center justify-center shrink-0">
-            <BookOpen className="w-3.5 h-3.5 text-teal-700" />
+          <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+            <Sparkles className="w-4 h-4 text-primary" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-stone-800 leading-none">AI Mentor</h2>
-            <p className="text-[10px] text-stone-400 mt-0.5 font-medium">Guided Socratic Help</p>
+            <h2 className="text-sm font-bold text-text leading-none">AI Learning Mentor</h2>
+            <p className="text-[11px] text-muted mt-1 font-medium">Guided Socratic Help</p>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          aria-label="Minimize mentor panel"
-          className="p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
-        >
-          <ChevronDown className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setIsMuted(!isMuted)}
+            aria-label={isMuted ? "Unmute audio" : "Mute audio"}
+            className="p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
+          >
+            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </button>
+          <button
+            onClick={onClose}
+            aria-label="Minimize mentor panel"
+            className="p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 sm:hidden"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* ── Scrollable body ──────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto min-h-0 scroll-smooth">
 
-        {/* Success state */}
-        {stage === 'success' ? (
-          <SuccessState onReset={handleReset} />
-        ) : (
-          <div className="px-3 py-4 space-y-4">
+        <div className="px-3 py-4 space-y-4">
 
-            {/* ── Context card ──────────────────────────────── */}
-            <div className="rounded-xl border border-amber-100 bg-amber-50/60 overflow-hidden">
-              <div className="px-4 pt-3 pb-1">
-                <SectionLabel>You may be stuck on</SectionLabel>
-                <p className="text-sm font-bold text-stone-900 leading-snug mb-2">
-                  {CONTEXT.concept}
-                </p>
+          {/* ── Empty state / Context card ──────────────────────────────── */}
+            {hints.length === 0 ? (
+              <div className="rounded-xl border border-border bg-surface-soft overflow-hidden">
+                <div className="px-4 py-4 text-center">
+                  <BookOpen className="w-8 h-8 text-muted mx-auto mb-2 opacity-50" />
+                  <p className="text-sm text-text font-medium mb-1">How can I help?</p>
+                  <p className="text-xs text-muted leading-relaxed">
+                    Ask the AI mentor about this lesson. You can request an explanation, example, summary, or quick quiz.
+                  </p>
+                </div>
               </div>
-              <div className="px-4 pb-3">
-                <p className="text-xs text-stone-500 leading-relaxed">
-                  {CONTEXT.why}
-                </p>
+            ) : isAutoDetected ? (
+              // System auto-detected struggle — show amber alert banner.
+              // Previously always said "noticed pauses or inactivity"
+              // verbatim regardless of what actually triggered it
+              // (sustained fixation, looking away, rewinding, pausing, or
+              // idling are five very different signals) — reasonText
+              // (from InterventionOverlay.jsx's getStruggleReasonText)
+              // says the real one when it's known.
+              <div className="rounded-xl border border-amber-100 bg-amber-50/60 overflow-hidden">
+                <div className="px-4 pt-3 pb-3">
+                  <SectionLabel>A-Quire detected you may be stuck</SectionLabel>
+                  <p className="text-xs text-stone-500 leading-relaxed">
+                    {reasonText
+                      ? `We noticed ${reasonText}. Your AI mentor is ready to help — no pressure.`
+                      : 'The system noticed pauses or inactivity. Your AI mentor is ready to help — no pressure.'}
+                  </p>
+                </div>
               </div>
-            </div>
-
-            {/* ── Hint 1 ────────────────────────────────────── */}
-            {(stage === 'hint-1' || stage === 'hint-2') && (
-              <HintCard
-                hint={HINTS[0]}
-                isNew={stage === 'hint-1'}
-                playingId={playingId}
-                onToggleAudio={handleToggleAudio}
-              />
+            ) : (
+              // Manual request — show a neutral, welcoming banner
+              <div className="rounded-xl border border-teal-100 bg-teal-50/50 overflow-hidden">
+                <div className="px-4 pt-3 pb-3">
+                  <SectionLabel>AI Mentor</SectionLabel>
+                  <p className="text-xs text-stone-500 leading-relaxed">
+                    Here’s some guidance to help you work through this section.
+                  </p>
+                </div>
+              </div>
             )}
 
-            {/* ── Hint 2 ────────────────────────────────────── */}
-            {stage === 'hint-2' && (
-              <HintCard
-                hint={HINTS[1]}
-                isNew={true}
-                playingId={playingId}
-                onToggleAudio={handleToggleAudio}
-              />
-            )}
+            {/* ── Real hints from API ────────────────────────── */}
+            {hints.map((hint, i) => {
+              const isStudent = typeof hint === 'object' && hint.role === 'student';
+              if (isStudent) {
+                return <UserMessageCard key={i} text={hint.text} />;
+              }
+              const hintText = typeof hint === 'string' ? hint : hint.text;
+              const hintLevel = typeof hint === 'object' ? hint.level : undefined;
+              const mentorIndex = hints.slice(0, i).filter(h => typeof h === 'string' || h.role !== 'student').length;
+              return (
+                <RealHintCard
+                  key={i}
+                  text={hintText}
+                  index={mentorIndex}
+                  level={hintLevel}
+                  isNew={i === hints.length - 1 && (stage === 'hint-1' || stage === 'hint-2')}
+                  audioBase64={hint.audio_base64}
+                  isMuted={isMuted}
+                />
+              );
+            })}
 
             {/* ── Loading skeleton ──────────────────────────── */}
-            {loadingNext && <LoadingCard />}
+            {(loadingNext || hintLoading) && <LoadingCard />}
 
-            {/* ── Support cards ─────────────────────────────── */}
-            {showAnalogy && !loadingNext && (
-              <SupportCard
-                title="Analogy"
-                body={ANALOGY.body}
-                icon={Layers}
-                playingId={playingId}
-                cardId="analogy"
-                onToggleAudio={handleToggleAudio}
-              />
-            )}
-
-            {showSimple && !loadingNext && (
-              <SupportCard
-                title="Simpler Explanation"
-                body={SIMPLE.body}
-                icon={AlignLeft}
-                playingId={playingId}
-                cardId="simple"
-                onToggleAudio={handleToggleAudio}
-              />
-            )}
-
-            {/* ── Response input (shown after hint-1) ───────── */}
-            {(stage === 'hint-1' || stage === 'hint-2') && !loadingNext && (
+            {/* ── Response input (shown after first hint) ───── */}
+            {mentorHints.length > 0 && !(loadingNext || hintLoading) && (
               <div className="rounded-xl border border-stone-200 bg-white overflow-hidden">
                 <label htmlFor="mentor-response" className="block px-4 pt-3 pb-1">
                   <SectionLabel>Your thinking</SectionLabel>
@@ -394,7 +469,8 @@ export default function MentorPanel({
                       {response.length > 0 ? `${response.length} chars` : 'No pressure — just think out loud'}
                     </span>
                     <button
-                      disabled={!response.trim()}
+                      onClick={handleSubmitResponse}
+                      disabled={!response.trim() || loadingNext}
                       className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg border transition-all disabled:opacity-30 disabled:cursor-not-allowed bg-white border-stone-200 text-stone-600 hover:border-teal-300 hover:text-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
                       aria-label="Submit your response"
                     >
@@ -405,20 +481,18 @@ export default function MentorPanel({
               </div>
             )}
 
-            <div ref={bottomRef} />
-          </div>
-        )}
+          <div ref={bottomRef} />
+        </div>
       </div>
 
-      {/* ── Footer actions (hidden in success) ──────────────────── */}
-      {stage !== 'success' && (
-        <div className="border-t border-stone-100 px-3 py-3 space-y-2 shrink-0 bg-white">
+      {/* ── Footer actions ───────────────────────────────────────────── */}
+      <div className="border-t border-stone-100 px-3 py-3 space-y-2 shrink-0 bg-white">
 
           {/* Support actions row */}
-          {(stage === 'hint-1' || stage === 'hint-2') && (
+          {(stage === 'hint-1' || stage === 'hint-2') && !(loadingNext || hintLoading) && (
             <div className="flex gap-1.5 mb-1">
               <button
-                onClick={() => { setShowAnalogy(true); setShowSimple(false); }}
+                onClick={() => { setShowAnalogy(true); setShowSimple(false); triggerHint('analogy'); }}
                 aria-pressed={showAnalogy}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-semibold rounded-lg border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 ${
                   showAnalogy
@@ -429,7 +503,7 @@ export default function MentorPanel({
                 <Layers className="w-3 h-3" /> Analogy
               </button>
               <button
-                onClick={() => { setShowSimple(true); setShowAnalogy(false); }}
+                onClick={() => { setShowSimple(true); setShowAnalogy(false); triggerHint('simpler'); }}
                 aria-pressed={showSimple}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-semibold rounded-lg border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 ${
                   showSimple
@@ -443,7 +517,7 @@ export default function MentorPanel({
           )}
 
           {/* Primary CTA: I understood */}
-          {(stage === 'hint-1' || stage === 'hint-2') && (
+          {mentorHints.length > 0 && !(loadingNext || hintLoading) && stage !== 'success' && (
             <button
               onClick={handleUnderstood}
               className="w-full flex items-center justify-center gap-2 py-2.5 bg-teal-700 text-white text-sm font-semibold rounded-xl hover:bg-teal-800 active:scale-[0.98] transition-all shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2"
@@ -455,7 +529,7 @@ export default function MentorPanel({
           )}
 
           {/* Secondary CTA: Next hint */}
-          {stage === 'hint-1' && !loadingNext && (
+          {mentorHints.length > 0 && mentorHints.length < 3 && !(loadingNext || hintLoading) && stage !== 'success' && (
             <button
               onClick={handleNextHint}
               className="w-full flex items-center justify-center gap-2 py-2 text-sm font-semibold text-stone-600 border border-stone-200 rounded-xl hover:bg-stone-50 hover:border-stone-300 active:scale-[0.98] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
@@ -467,26 +541,59 @@ export default function MentorPanel({
           )}
 
           {/* Idle state — first action */}
-          {stage === 'idle' && !loadingNext && (
-            <button
-              onClick={handleFirstHint}
-              className="w-full flex items-center justify-center gap-2 py-2.5 bg-teal-700 text-white text-sm font-semibold rounded-xl hover:bg-teal-800 active:scale-[0.98] transition-all shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2"
-              aria-label="Get the first gentle hint"
-            >
-              <Sparkles className="w-4 h-4" />
-              Start with a gentle hint
-            </button>
+          {mentorHints.length === 0 && !(loadingNext || hintLoading) && (
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleFirstHint}
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-[var(--primary)] text-white text-sm font-semibold rounded-xl hover:opacity-90 active:scale-[0.98] transition-all shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
+                aria-label="Get the first gentle hint"
+              >
+                <Sparkles className="w-4 h-4" />
+                Start with a gentle hint
+              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => triggerHint('detailed')}
+                  className="py-1.5 px-2 text-xs font-semibold text-stone-600 border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
+                >
+                  Explain this part
+                </button>
+                <button
+                  onClick={() => triggerHint('example')}
+                  className="py-1.5 px-2 text-xs font-semibold text-stone-600 border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
+                >
+                  Give an example
+                </button>
+                <button
+                  onClick={() => triggerHint('quiz')}
+                  className="py-1.5 px-2 text-xs font-semibold text-stone-600 border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
+                >
+                  Quiz me
+                </button>
+                <button
+                  onClick={() => triggerHint('summary')}
+                  className="py-1.5 px-2 text-xs font-semibold text-stone-600 border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
+                >
+                  Summarize so far
+                </button>
+                <button
+                  onClick={() => triggerHint('confused')}
+                  className="py-1.5 px-2 text-xs font-semibold text-stone-600 border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors col-span-2"
+                >
+                  I am confused
+                </button>
+              </div>
+            </div>
           )}
 
           {/* Loading state */}
-          {loadingNext && (
+          {(loadingNext || hintLoading) && (
             <div className="w-full flex items-center justify-center gap-2 py-2.5 bg-stone-50 border border-stone-100 text-stone-400 text-sm font-medium rounded-xl">
               <Loader2 className="w-4 h-4 animate-spin text-teal-500" />
               Preparing next step…
             </div>
           )}
         </div>
-      )}
     </aside>
   );
 }

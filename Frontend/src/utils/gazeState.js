@@ -11,7 +11,25 @@ export const TrackingState = {
 export const AttentionState = {
   UNKNOWN: 'unknown',
   ON_LESSON: 'on_lesson',
-  OFF_LESSON: 'off_lesson'
+  OFF_LESSON: 'off_lesson',
+  // Never set by GazeStateMachine.update() itself (see below) — both
+  // trackers (legacyGazeTracker.js's own loop, and useGazeTracker.js's
+  // sustained-fixation override for the calibrated tracker) set this
+  // directly on top of whatever this state machine produced. It's listed
+  // here anyway because every consumer (GazeStatusPill.jsx,
+  // LessonPlayer.jsx, DsaProblemPage.tsx, QuestionPracticePage.tsx)
+  // compares against AttentionState.FIXATED — this key was missing
+  // entirely, silently making that comparison `undefined === undefined`.
+  // That happened to still evaluate true against itself everywhere (same
+  // shared object, same missing key), so the struggle-detection logic
+  // that reads attentionState worked despite it — but the pill's own
+  // label logic checks `=== AttentionState.ON_LESSON` /
+  // `=== AttentionState.OFF_LESSON` and falls through to a generic
+  // "Gaze tracking active" label for anything else, including this
+  // (undefined) state — so a real fixation/confusion episode produced
+  // zero visible UI feedback even when it correctly fired a struggle
+  // event underneath. See GazeStatusPill.jsx for the added branch.
+  FIXATED: 'fixated'
 };
 
 export const GazeConstants = {

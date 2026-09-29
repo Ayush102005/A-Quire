@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import {
   ChevronRight, ChevronLeft, Check, Loader2, Target, BookOpen,
   Languages, Search, Camera, Sliders, Sparkles, Clock,
-  GraduationCap, X, Play, LayoutDashboard,
+  GraduationCap, X, Play, LayoutDashboard, AlertCircle,
 } from 'lucide-react';
 import { api } from '../services/api';
+
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 const GOALS = [
@@ -55,7 +56,6 @@ function ProgressBar({ step }) {
   );
 }
 
-// ── StepCard ──────────────────────────────────────────────────────────────────
 function StepCard({ children }) {
   return (
     <div className="w-full max-w-xl mx-auto bg-white border border-stone-200/80 rounded-2xl shadow-[0_2px_20px_rgba(0,0,0,0.06)] px-6 sm:px-10 py-8 sm:py-10">
@@ -64,7 +64,6 @@ function StepCard({ children }) {
   );
 }
 
-// ── StepHeading ───────────────────────────────────────────────────────────────
 function StepHeading({ icon: Icon, label, desc }) {
   return (
     <div className="mb-6">
@@ -79,7 +78,6 @@ function StepHeading({ icon: Icon, label, desc }) {
   );
 }
 
-// ── NavRow ────────────────────────────────────────────────────────────────────
 function NavRow({ onBack, onNext, nextLabel = 'Continue', nextDisabled = false, loading = false, showBack = true }) {
   return (
     <div className={`flex items-center mt-8 ${showBack ? 'justify-between' : 'justify-end'}`}>
@@ -113,7 +111,7 @@ function NavRow({ onBack, onNext, nextLabel = 'Continue', nextDisabled = false, 
 }
 
 // ── Step 1: Welcome ───────────────────────────────────────────────────────────
-function Step1Welcome({ onNext, onSkip, loading }) {
+function Step1Welcome({ onNext, onSkip }) {
   return (
     <StepCard>
       <div className="text-center py-4">
@@ -132,10 +130,9 @@ function Step1Welcome({ onNext, onSkip, loading }) {
         <div className="flex flex-col gap-3">
           <button
             onClick={onNext}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold transition-all shadow-sm hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-600/25 disabled:opacity-60"
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold transition-all shadow-sm hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-600/25"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Get Started"} <ChevronRight className="w-4 h-4" />
+            Get Started <ChevronRight className="w-4 h-4" />
           </button>
           <button
             onClick={onSkip}
@@ -150,7 +147,7 @@ function Step1Welcome({ onNext, onSkip, loading }) {
 }
 
 // ── Step 2: Learning Goals ────────────────────────────────────────────────────
-function Step2Goals({ goals, setGoals, onNext, onBack, attempted, loading }) {
+function Step2Goals({ goals, setGoals, onNext, onBack, attempted }) {
   const toggle = (id) =>
     setGoals((prev) => prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]);
 
@@ -190,7 +187,7 @@ function Step2Goals({ goals, setGoals, onNext, onBack, attempted, loading }) {
           <X className="w-3.5 h-3.5" /> Please select at least one goal.
         </p>
       )}
-      <NavRow onBack={onBack} onNext={onNext} nextDisabled={false} loading={loading} />
+      <NavRow onBack={onBack} onNext={onNext} nextDisabled={false} />
     </StepCard>
   );
 }
@@ -236,7 +233,7 @@ function Step3Language({ language, setLanguage, onNext, onBack }) {
 }
 
 // ── Step 4: Subjects ──────────────────────────────────────────────────────────
-function Step4Subjects({ subjects, setSubjects, onNext, onBack, attempted, loading }) {
+function Step4Subjects({ subjects, setSubjects, onNext, onBack, attempted }) {
   const [query, setQuery] = useState('');
   const filtered = SUBJECTS.filter((s) => s.toLowerCase().includes(query.toLowerCase()));
   const toggle = (s) =>
@@ -288,7 +285,7 @@ function Step4Subjects({ subjects, setSubjects, onNext, onBack, attempted, loadi
           <X className="w-3.5 h-3.5" /> Select at least one subject.
         </p>
       )}
-      <NavRow onBack={onBack} onNext={onNext} nextDisabled={false} loading={loading} />
+      <NavRow onBack={onBack} onNext={onNext} nextDisabled={false} />
     </StepCard>
   );
 }
@@ -355,8 +352,7 @@ function SegGroup({ label, options, value, onChange }) {
   );
 }
 
-// ── Step 6 Prefs ──────────────────────────────────────────────────────────────
-function Step6Prefs({ prefs, setPrefs, onNext, onBack, loading }) {
+function Step6Prefs({ prefs, setPrefs, onNext, onBack }) {
   const set = (key, val) => setPrefs((p) => ({ ...p, [key]: val }));
 
   return (
@@ -387,7 +383,7 @@ function Step6Prefs({ prefs, setPrefs, onNext, onBack, loading }) {
           </div>
         </div>
       </div>
-      <NavRow onBack={onBack} onNext={onNext} loading={loading} />
+      <NavRow onBack={onBack} onNext={onNext} />
     </StepCard>
   );
 }
@@ -430,7 +426,7 @@ function Step7Finish({ goals, language, subjects, prefs, onStart, onDashboard, l
         <button
           onClick={onStart}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold transition-all shadow-sm hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-600/25 disabled:opacity-60"
+          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold transition-all shadow-sm hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-600/25"
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
           Start Learning
@@ -456,87 +452,63 @@ export default function StudentOnboarding() {
   const [prefs, setPrefs]       = useState({ pace: 'Balanced', reminder: 'Daily nudge', helpFreq: 'Intervene automatically', dailyGoal: 60 });
   const [attempted, setAttempted] = useState(false);
   const [loading, setLoading]   = useState(false);
+  const [apiError, setApiError] = useState('');
 
   const next = () => { setAttempted(false); setStep((s) => Math.min(s + 1, TOTAL_STEPS)); };
   const back = () => { setAttempted(false); setStep((s) => Math.max(s - 1, 1)); };
-
-  const [error, setError] = useState('');
-
-  async function handleStartWelcome() {
-    setLoading(true);
-    try {
-      // Set the user's role to student in onboarding tracker
-      await api.onboarding.setRole('student').catch(() => {});
-      setLoading(false);
-      next();
-    } catch (err) {
-      setLoading(false);
-      next(); // Fail-safe: transition to next step even if API has a minor glitch
-    }
-  }
 
   function handleGoalsNext() {
     if (goals.length === 0) { setAttempted(true); return; }
     next();
   }
-
-  async function handleSubjectsNext() {
+  function handleSubjectsNext() {
     if (subjects.length === 0) { setAttempted(true); return; }
-    setLoading(true);
-    try {
-      // Save profile info (goals & subjects/interests)
-      await api.onboarding.saveProfile(goals.join(', '), subjects.join(', '));
-      setLoading(false);
-      next();
-    } catch (err) {
-      setLoading(false);
-      setError(err.message || 'Failed to save profile details.');
-      next(); // fallback
-    }
+    next();
   }
 
-  async function handlePrefsNext() {
-    setLoading(true);
-    try {
-      const emailNotif = prefs.reminder !== 'None';
-      const reminderFreq = prefs.reminder === 'None' ? 'none' : prefs.reminder === 'Daily nudge' ? 'daily' : 'weekly';
-      
-      // Save preferences (language, timezone, notifications)
-      await api.onboarding.savePreferences(
-        language,
-        Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-        emailNotif,
-        reminderFreq
-      );
-      setLoading(false);
-      next();
-    } catch (err) {
-      setLoading(false);
-      setError(err.message || 'Failed to save preferences.');
-      next(); // fallback
-    }
+  async function runOnboardingApi() {
+    // 1. Set role to student
+    await api.onboarding.setRole('student');
+    // 2. Save goals (as goal IDs) and subjects as interests
+    await api.onboarding.saveProfile(goals, subjects);
+    // 3. Save learning preferences
+    const emailNotifications = prefs.reminder !== 'None';
+    await api.onboarding.savePreferences(language, 'UTC', emailNotifications, prefs.reminder);
+    // 4. Mark onboarding as complete
+    await api.onboarding.finalize();
+    // 5. Refresh user in localStorage so downstream components see onboarding_complete=true
+    const updatedUser = await api.getMe();
+    localStorage.setItem('user', JSON.stringify(updatedUser));
   }
 
   async function handleStart() {
     setLoading(true);
+    setApiError('');
     try {
-      // Finalize onboarding in DB
-      await api.onboarding.finalize();
-      
-      // Update local storage user profile
-      const user = await api.getMe();
-      localStorage.setItem("user", JSON.stringify(user));
-      
-      setLoading(false);
-      navigate('/dashboard'); // Go to real student dashboard
+      await runOnboardingApi();
+      navigate('/dashboard');
     } catch (err) {
+      setApiError(err.message || 'Something went wrong. Please try again.');
       setLoading(false);
-      navigate('/dashboard'); // fallback
+    }
+  }
+
+  async function handleGoToDashboard() {
+    // Also finalize in case the user skips via this button
+    setLoading(true);
+    setApiError('');
+    try {
+      await runOnboardingApi();
+    } catch (_) {
+      // Best-effort — still navigate even if API fails
+    } finally {
+      setLoading(false);
+      navigate('/dashboard');
     }
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center px-4 py-10 font-sans">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-10 font-sans" style={{backgroundColor:'var(--bg)'}}>
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-[400px] h-[400px] rounded-full bg-teal-50 opacity-60 blur-3xl" />
         <div className="absolute -bottom-32 -left-32 w-[350px] h-[350px] rounded-full bg-stone-100 opacity-80 blur-3xl" />
@@ -549,30 +521,32 @@ export default function StudentOnboarding() {
           <span className="font-semibold text-stone-800 text-lg tracking-tight">A-Quire</span>
         </div>
 
-        {/* Error message alert */}
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl text-sm font-medium">
-            {error}
-          </div>
-        )}
-
         {/* Progress (hidden on step 1) */}
         {step > 1 && <ProgressBar step={step} />}
 
+        {/* API error banner */}
+        {apiError && (
+          <div className="mb-4 flex items-start gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+            <span>{apiError}</span>
+          </div>
+        )}
+
         {/* Steps */}
-        {step === 1 && <Step1Welcome onNext={handleStartWelcome} onSkip={() => navigate('/dashboard')} loading={loading} />}
-        {step === 2 && <Step2Goals goals={goals} setGoals={setGoals} onNext={handleGoalsNext} onBack={back} attempted={attempted} loading={loading} />}
+        {step === 1 && <Step1Welcome onNext={next} onSkip={() => navigate('/dashboard')} />}
+        {step === 2 && <Step2Goals goals={goals} setGoals={setGoals} onNext={handleGoalsNext} onBack={back} attempted={attempted} />}
         {step === 3 && <Step3Language language={language} setLanguage={setLanguage} onNext={next} onBack={back} />}
-        {step === 4 && <Step4Subjects subjects={subjects} setSubjects={setSubjects} onNext={handleSubjectsNext} onBack={back} attempted={attempted} loading={loading} />}
+        {step === 4 && <Step4Subjects subjects={subjects} setSubjects={setSubjects} onNext={handleSubjectsNext} onBack={back} attempted={attempted} />}
         {step === 5 && <Step5Permissions onNext={next} onBack={back} />}
-        {step === 6 && <Step6Prefs prefs={prefs} setPrefs={setPrefs} onNext={handlePrefsNext} onBack={back} loading={loading} />}
+        {step === 6 && <Step6Prefs prefs={prefs} setPrefs={setPrefs} onNext={next} onBack={back} />}
         {step === 7 && (
           <Step7Finish
             goals={goals} language={language} subjects={subjects} prefs={prefs}
-            onStart={handleStart} onDashboard={handleStart} loading={loading}
+            onStart={handleStart} onDashboard={handleGoToDashboard} loading={loading}
           />
         )}
       </div>
     </div>
   );
 }
+

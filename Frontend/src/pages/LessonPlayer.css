@@ -1,0 +1,250 @@
+:root {
+  /* Visual system colors requested by user */
+  --bg: #F8FAFC;
+  --surface: #FFFFFF;
+  --surface-soft: #F8FAFC; /* slightly different for bg but standard requested is F8FAFC */
+  --border: #E2E8F0;
+  --text: #0F172A;
+  --muted: #64748B;
+  --primary: #4F46E5;
+  --secondary: #0EA5E9;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --radius: 16px;
+}
+
+[data-theme='dark'] {
+  --bg: #0F172A;
+  --surface: #1E293B;
+  --surface-soft: #334155;
+  --border: #334155;
+  --text: #F8FAFC;
+  --muted: #94A3B8;
+  --primary: #6366F1;
+  --secondary: #38BDF8;
+  --success: #34D399;
+  --warning: #FBBF24;
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5);
+}
+
+.lesson-player {
+  min-height: 100vh;
+  padding: 24px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.lesson-player,
+.lesson-player * {
+  box-sizing: border-box;
+}
+
+/* Header */
+.lesson-player__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.lesson-player__header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.button--back {
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.button--back:hover {
+  background: var(--surface-soft);
+}
+
+.lesson-player__eyebrow {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.lesson-player__title {
+  margin: 4px 0 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Layout */
+.lesson-player__layout {
+  display: grid;
+  grid-template-columns: 65fr 35fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.lesson-player__main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.lesson-player__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: sticky;
+  top: 24px;
+  height: calc(100vh - 48px);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+
+/* Video Card overrides */
+.video-card {
+  padding: 0;
+  overflow: hidden;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius);
+}
+
+.video-card__frame {
+  position: relative;
+  background: #000;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+}
+
+/* Mobile behavior */
+.lesson-player__mobile-bar {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .lesson-player__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .lesson-player__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .lesson-player__header-right {
+    align-self: flex-end;
+  }
+
+  /* Show mobile bar to toggle tabs/mentor */
+  .lesson-player__mobile-bar {
+    display: flex;
+    gap: 8px;
+    padding: 12px 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .lesson-player {
+    padding: 16px;
+    padding-bottom: 96px;
+  }
+  
+  .lesson-player__sidebar {
+    height: auto;
+    position: static;
+  }
+}
+
+/* Tabs */
+.learning-tabs {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  min-height: 400px;
+  max-height: 600px;
+}
+
+.learning-tabs__header {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.learning-tab__button {
+  padding: 16px 20px;
+  background: none;
+  border: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.learning-tab__button:hover {
+  color: var(--text);
+}
+
+.learning-tab__button--active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.learning-tabs__content {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+}
+
+/* Quick Actions in Mentor */
+.quick-action-chip {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  border-radius: 99px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.quick-action-chip:hover {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.quick-actions-container {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 12px 16px 0;
+  scrollbar-width: none;
+}

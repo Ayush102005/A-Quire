@@ -7,6 +7,20 @@
     <title>A-Quire — AI-Powered Learning Platform</title>
     <meta name="description" content="A-Quire detects learning struggles in real-time and provides Socratic AI guidance to keep students on track. Built for universities and online learning." />
     <meta name="theme-color" content="#0F766E" />
+    <!-- Dark mode: apply class synchronously before first paint to prevent FOUC -->
+    <script>
+      (function() {
+        try {
+          var stored = localStorage.getItem('aq-theme');
+          if (stored === 'light') { /* leave .dark unset */ return; }
+          if (stored === 'dark' || !stored) {
+            document.documentElement.classList.add('dark');
+          }
+        } catch(e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;0,14..32,900&display=swap" rel="stylesheet" />

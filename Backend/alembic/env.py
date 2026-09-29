@@ -1,61 +1,66 @@
 """
-Async-compatible Alembic env.py.
-
-Imports all models so `alembic revision --autogenerate` picks up every table.
-Uses async_engine_from_config so the asyncpg DATABASE_URL works end-to-end.
+alembic/env.py
+───────────────
+Alembic migration environment — async-aware, reads DATABASE_URL from .env.
 """
+from __future__ import annotations
+
 import asyncio
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
-from alembic import context
 
+# ── Load app config + models ───────────────────────────────────────────────
+# Import settings so DATABASE_URL is available
 from app.core.config import settings
-from app.core.database import Base
 
-# ── import every model so Base.metadata is fully populated ───────────────────
-# NOTE: course.py now contains Course, Module, and Lesson — single source of truth
-from app.models import user         # noqa: F401
-from app.models import course       # noqa: F401  (exports Course, Module, Lesson)
-from app.models import progress     # noqa: F401
-from app.models import struggle     # noqa: F401
-from app.models import quiz         # noqa: F401
-from app.models import notification # noqa: F401
-from app.models import onboarding   # noqa: F401
-from app.models import profile      # noqa: F401
+# Import all models so their tables are registered on Base.metadata
+import app.models  # noqa: F401  (side-effect: populates Base.metadata)
 
-# ─────────────────────────────────────────────────────────────────────────────
+from app.db.session import Base
+
+# ── Alembic Config ─────────────────────────────────────────────────────────
 config = context.config
+
+# Override sqlalchemy.url from our pydantic settings (ignores alembic.ini value)
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
+# Set up Python logging from alembic.ini
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
 
 
-def do_run_migrations(connection):
-    context.configure(connection=connection, target_metadata=target_metadata)
-    with context.begin_transaction():
-        context.run_migrations()
-
-
+# ── Offline migrations (generate SQL without DB connection) ────────────────
 def run_migrations_offline() -> None:
-    """Offline mode — generate SQL without a live DB connection."""
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        compare_type=True,
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+# ── Online migrations (connect to real DB) ─────────────────────────────────
+def do_run_migrations(connection):
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        compare_type=True,
+        render_as_batch=True,
     )
     with context.begin_transaction():
         context.run_migrations()
 
 
 async def run_async_migrations() -> None:
-    """Online mode — connect via asyncpg and run migrations."""
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

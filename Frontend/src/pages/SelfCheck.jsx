@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, BookOpen, BrainCircuit, ChevronRight, CheckCircle2,
@@ -134,6 +134,8 @@ export default function SelfCheck() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [aiNotice, setAiNotice] = useState(null);
+
   const [qIdx, setQIdx]           = useState(0);
   const [selected, setSelected]   = useState(null);
   const [confidence, setConfidence] = useState(null);
@@ -143,31 +145,47 @@ export default function SelfCheck() {
   const [accumulatedResponses, setAccumulatedResponses] = useState([]);
   const [done, setDone]               = useState(false);
   const [scoreResult, setScoreResult] = useState(null);
+  const [courseId, setCourseId]       = useState(null);
 
   useEffect(() => {
     async function loadQuiz() {
       setLoading(true);
       try {
         const queryParams = new URLSearchParams(window.location.search);
-        const quizId = Number(queryParams.get('id')) || 1; // Default to seeded quiz 1
-        
-        const data = await api.quizzes.get(quizId);
+        // Support both ?topic=<id> (linked from CourseDetail) and legacy ?id=<id>
+        const topicId = Number(queryParams.get('topic') || queryParams.get('id')) || null;
+        // Course this quiz was launched from, if any — enables course-scoped
+        // instructor analytics (Analytics > Assessments/Concepts).
+        setCourseId(Number(queryParams.get('course')) || null);
+
+        if (!topicId) {
+          setError('No topic selected. Please navigate here from a course lesson.');
+          setLoading(false);
+          return;
+        }
+
+        const data = await api.quizzes.get(topicId);
+
         setQuiz(data);
         
         const mappedQuestions = data.questions.map(q => {
-          let opts = [];
-          try {
-            opts = JSON.parse(q.options);
-          } catch {
-            opts = ["A", "B", "C", "D"];
+          // Backend returns options as an already-parsed dict {A: "text", B: "text", ...}
+          // (FastAPI serializes JSONB columns directly to JS objects — never a JSON string).
+          let optsDict;
+          if (q.options && typeof q.options === 'object' && !Array.isArray(q.options)) {
+            optsDict = q.options;
+          } else {
+            // Defensive fallback: if it somehow arrives as a string, try to parse it
+            try { optsDict = JSON.parse(q.options); } catch { optsDict = { A: 'Option A', B: 'Option B', C: 'Option C', D: 'Option D' }; }
           }
           return {
             id: q.id,
             text: q.question_text,
-            options: opts.map((o, idx) => ({ id: String.fromCharCode(97 + idx), text: o })),
+            // Convert {A: "text"} → [{id: "A", text: "text"}, ...] preserving key order
+            options: Object.entries(optsDict).map(([key, val]) => ({ id: key, text: val })),
             correctValue: q.correct_answer,
-            explanation: `According to standard thermodynamics, the correct response is: ${q.correct_answer}.`,
-            hint: "Recall the key definitions of the Zeroth Law or Heat Capacity."
+            explanation: `The correct answer is: ${q.correct_answer}.`,
+            hint: 'Review the key definitions related to this concept.'
           };
         });
 
@@ -193,7 +211,7 @@ export default function SelfCheck() {
     const type = isCorrect ? 'correct' : 'incorrect';
     
     // Track accumulated answers
-    const newResponse = { questionId: question.id, answer: selectedOption.text };
+    const newResponse = { questionId: question.id, answer: selectedOption.text, confidence: confidence };
     setAccumulatedResponses(prev => [...prev, newResponse]);
     setResults(r => ({ ...r, [qIdx]: type }));
     setResultType(type);
@@ -205,7 +223,7 @@ export default function SelfCheck() {
       setLoading(true);
       try {
         // Submit all responses to backend database
-        const submissionResult = await api.quizzes.submit(quiz.id, accumulatedResponses);
+        const submissionResult = await api.quizzes.submit(quiz.id, accumulatedResponses, courseId);
         setScoreResult(submissionResult);
         setDone(true);
       } catch (err) {
@@ -237,7 +255,7 @@ export default function SelfCheck() {
 
   if (loading && questions.length === 0) {
     return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+      <div className="min-h-screen app-bg flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 text-teal-700 animate-spin" />
           <p className="text-stone-500 font-medium">Loading conceptual check...</p>
@@ -248,7 +266,7 @@ export default function SelfCheck() {
 
   if (error || !quiz) {
     return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center p-4">
+      <div className="min-h-screen app-bg flex items-center justify-center p-4">
         <div className="max-w-md bg-white border border-stone-200 p-8 rounded-2xl shadow-sm text-center">
           <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-stone-900 mb-2">Error Loading Quiz</h3>
@@ -266,10 +284,10 @@ export default function SelfCheck() {
   const meta = resultType ? resultMeta(resultType) : null;
 
   return (
-    <div className="min-h-screen bg-stone-50 font-sans text-stone-900">
+    <div className="min-h-screen app-bg font-sans">
 
       {/* Top bar */}
-      <header className="sticky top-0 z-40 bg-stone-50/90 backdrop-blur-md border-b border-stone-200 px-4 sm:px-6 h-14 flex items-center gap-4">
+      <header className="sticky top-0 z-40 app-header backdrop-blur-md px-4 sm:px-6 h-14 flex items-center gap-4">
         <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 text-sm font-medium text-stone-500 hover:text-stone-800 transition-colors border-0 bg-transparent cursor-pointer">
           <ArrowLeft className="w-4 h-4" />Back
         </button>
@@ -293,6 +311,21 @@ export default function SelfCheck() {
           </div>
         ) : (
           <div className="flex flex-col gap-6">
+            {aiNotice && (
+              <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-800 flex items-start gap-3 animate-fade-in">
+                <Lightbulb className="w-5 h-5 shrink-0 mt-0.5 text-indigo-500" />
+                <div>
+                  <h3 className="font-bold text-sm">AI Mentor Notice</h3>
+                  <p className="text-sm mt-1">{aiNotice}</p>
+                  <button 
+                    onClick={() => setAiNotice(null)}
+                    className="mt-2 text-xs font-bold uppercase tracking-wider bg-indigo-200 hover:bg-indigo-300 text-indigo-900 px-3 py-1.5 rounded transition-colors"
+                  >
+                    Got it
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Progress header */}
             <div className="flex items-center justify-between">
@@ -399,9 +432,9 @@ export default function SelfCheck() {
                   {!submitted ? (
                     <button
                       onClick={handleSubmitAnswer}
-                      disabled={!selected || checkLoading}
+                      disabled={!selected || !confidence || checkLoading}
                       className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all shadow-sm focus-visible:outline-none ${
-                        selected && !checkLoading
+                        selected && confidence && !checkLoading
                           ? 'bg-teal-700 hover:bg-teal-800 text-white cursor-pointer'
                           : 'bg-stone-200 text-stone-400 cursor-not-allowed'
                       }`}

@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment secrets — NEVER commit real keys
+.env
+*.env
+.env.local
+.env.production
+.env.staging
+
+# Firebase service account (NEVER commit this!)
+firebase-credentials.json
+*.json.bak
+
+# Development artefacts
+local.db
+*.db
+fix_db.py
+seed_assessment.py
+test_quiz.py
+
+# IDE / OS
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# Alembic compiled
+__pycache__/
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Uploaded lesson study-material PDFs (user content, not source)
+uploads/

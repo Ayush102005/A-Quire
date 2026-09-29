@@ -89,7 +89,7 @@ export default function ResetPassword() {
   // ── No token in URL ────────────────────────────────────────────────────────
   if (noToken) {
     return (
-      <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center px-4 py-12 font-sans">
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12 font-sans" style={{backgroundColor:'var(--bg)'}}>
         <div aria-hidden="true" className="pointer-events-none fixed inset-0 overflow-hidden">
           <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-teal-50 opacity-60 blur-3xl" />
         </div>
@@ -117,7 +117,7 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center px-4 py-12 font-sans">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12 font-sans" style={{backgroundColor:'var(--bg)'}}>
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-teal-50 opacity-60 blur-3xl" />
         <div className="absolute -bottom-32 -left-32 w-80 h-80 rounded-full bg-stone-100 opacity-80 blur-3xl" />

@@ -1,112 +1,110 @@
 /**
  * oneEuroFilter.js
- * ================
- * The One Euro Filter (Casiez, Roussel, Vogel — "1€ Filter: A Simple
- * Speed-based Low-pass Filter for Noisy Input in Interactive Systems",
- * CHI 2012). A low-pass filter whose cutoff frequency adapts to the
- * estimated speed of the signal: slow/stationary input gets a low cutoff
- * (heavy smoothing, low jitter), fast-moving input gets a higher cutoff
- * (light smoothing, low lag). This replaces a fixed-alpha EMA, which can
- * only ever sit at one point on that tradeoff.
+ * =================
+ * The 1€ Filter (Casiez, Roussel, Vogel 2012) — an adaptive low-pass filter
+ * for noisy, real-time signals (mouse/gaze/motion tracking). Unlike a fixed-
+ * alpha EMA, its cutoff frequency adapts to the signal's own speed: slow
+ * movement (or stillness) gets heavy smoothing (low jitter while fixating),
+ * fast movement gets light smoothing (low lag when the eye actually moves).
+ * A fixed-alpha EMA can only ever pick one point on that tradeoff.
  *
- * Used by gazeEngine.js to smooth the raw gaze point per axis (`x`, `y`
- * each get their own filter instance, sharing timestamps) — see
- * `smoothGaze()` there.
+ * Reference: https://cristal.univ-lille.fr/~casiez/1euro/
  *
- * Tuning sequence (repeat at both GPU- and CPU-delegate speeds — worker
- * round-trip time changes the felt lag/jitter tradeoff):
- *   1. Set `beta = 0`. Increase `minCutoff` until jitter while fixating
- *      (staring at one point) is acceptable.
- *   2. Move the calibration target quickly. Increase `beta` until the
- *      filtered point follows without visible lag.
- *   3. Re-check step 1 hasn't regressed; iterate.
+ * Tuning sequence (do this against real, live data — these defaults are a
+ * starting point, not empirically tuned):
+ *   1. Set beta = 0, increase minCutoff until stationary-fixation jitter is
+ *      acceptable.
+ *   2. Move the target quickly and increase beta until the filtered value
+ *      follows without visible lag.
+ *   3. Repeat at both GPU- and CPU-delegate speeds — round-trip latency
+ *      differs enough between them to change the felt lag/jitter tradeoff.
  */
 
-class LowPassFilter {
-  constructor(alpha) {
-    this._alpha = alpha;
-    this._y = null;
-    this._s = null;
-    this._initialized = false;
-  }
-
-  setAlpha(alpha) {
-    this._alpha = alpha;
-  }
-
-  filter(value) {
-    let result;
-    if (this._initialized) {
-      result = this._alpha * value + (1 - this._alpha) * this._s;
-    } else {
-      result = value;
-      this._initialized = true;
-    }
-    this._y = value;
-    this._s = result;
-    return result;
-  }
-
-  lastRawValue() {
-    return this._y;
-  }
-
-  reset() {
-    this._y = null;
-    this._s = null;
-    this._initialized = false;
-  }
+function lowPass(prevValue, value, alpha) {
+  return prevValue === null ? value : alpha * value + (1 - alpha) * prevValue;
 }
 
-function smoothingFactor(dtSeconds, cutoffHz) {
-  const r = 2 * Math.PI * cutoffHz * dtSeconds;
-  return r / (r + 1);
+function smoothingAlpha(cutoff, dtSeconds) {
+  const tau = 1 / (2 * Math.PI * cutoff);
+  return 1 / (1 + tau / dtSeconds);
 }
 
 /**
- * @param {{ minCutoff?: number, beta?: number, dCutoff?: number }} params
- * @returns {{
- *   filter: (value: number, timestampMs: number) => number,
- *   reset: () => void,
- * }}
+ * @param {object} [options]
+ * @param {number} [options.minCutoff=1.0] Baseline cutoff (Hz) — higher =
+ *   less lag but more jitter while still. Tune this first, with beta=0.
+ * @param {number} [options.beta=0.05] Speed coefficient — higher = cutoff
+ *   rises faster with signal speed, reducing lag on fast movement at the
+ *   cost of a bit more jitter. Tune second, after minCutoff.
+ * @param {number} [options.dCutoff=1.0] Cutoff (Hz) for the derivative
+ *   (speed) estimate itself — rarely needs tuning.
+ * @returns {{ filter: (value: number, timestampMs: number) => number, reset: () => void }}
  */
 export function createOneEuroFilter({ minCutoff = 1.0, beta = 0.05, dCutoff = 1.0 } = {}) {
-  const xFilter = new LowPassFilter(smoothingFactor(1, minCutoff));
-  const dxFilter = new LowPassFilter(smoothingFactor(1, dCutoff));
-  let lastTimestampMs = null;
+  let prevValue = null;
+  let prevDerivative = null;
+  let prevTimestampMs = null;
 
+  function reset() {
+    prevValue = null;
+    prevDerivative = null;
+    prevTimestampMs = null;
+  }
+
+  function filter(value, timestampMs) {
+    if (!Number.isFinite(value)) return value; // never let a bad reading corrupt filter state
+
+    if (prevTimestampMs === null) {
+      prevValue = value;
+      prevDerivative = 0;
+      prevTimestampMs = timestampMs;
+      return value;
+    }
+
+    // Guard against a zero/negative/absurd dt (duplicate or out-of-order
+    // timestamps, a tab coming back from being backgrounded) — treat as a
+    // fresh start rather than dividing by ~0 or smoothing across a huge gap.
+    const dtSeconds = (timestampMs - prevTimestampMs) / 1000;
+    if (!(dtSeconds > 0) || dtSeconds > 2) {
+      prevValue = value;
+      prevDerivative = 0;
+      prevTimestampMs = timestampMs;
+      return value;
+    }
+
+    const derivative = (value - prevValue) / dtSeconds;
+    const dAlpha = smoothingAlpha(dCutoff, dtSeconds);
+    const smoothedDerivative = lowPass(prevDerivative, derivative, dAlpha);
+
+    const cutoff = minCutoff + beta * Math.abs(smoothedDerivative);
+    const alpha = smoothingAlpha(cutoff, dtSeconds);
+    const smoothedValue = lowPass(prevValue, value, alpha);
+
+    prevValue = smoothedValue;
+    prevDerivative = smoothedDerivative;
+    prevTimestampMs = timestampMs;
+
+    return smoothedValue;
+  }
+
+  return { filter, reset };
+}
+
+/**
+ * A bank of independent 1€ filters, one per dimension of a fixed-size
+ * feature vector — convenience wrapper so callers don't manage an array of
+ * filters by hand. Dimensions with non-finite input pass through
+ * unfiltered rather than corrupting that dimension's filter state (see
+ * createOneEuroFilter's own guard).
+ */
+export function createOneEuroFilterBank(dimensions, options) {
+  const filters = Array.from({ length: dimensions }, () => createOneEuroFilter(options));
   return {
-    /** @param {number} value @param {number} timestampMs @returns {number} */
-    filter(value, timestampMs) {
-      if (lastTimestampMs === null) {
-        lastTimestampMs = timestampMs;
-        xFilter.filter(value);
-        dxFilter.filter(0);
-        return value;
-      }
-
-      // Guard against a non-increasing or absurdly large gap (clock skew,
-      // paused tab resuming) rather than letting dt go to 0 or explode the
-      // derivative estimate.
-      const dtSeconds = Math.min(Math.max((timestampMs - lastTimestampMs) / 1000, 1e-3), 1);
-      lastTimestampMs = timestampMs;
-
-      const prevValue = xFilter.lastRawValue();
-      const dx = prevValue === null ? 0 : (value - prevValue) / dtSeconds;
-
-      dxFilter.setAlpha(smoothingFactor(dtSeconds, dCutoff));
-      const edx = dxFilter.filter(dx);
-
-      const cutoff = minCutoff + beta * Math.abs(edx);
-      xFilter.setAlpha(smoothingFactor(dtSeconds, cutoff));
-      return xFilter.filter(value);
+    filter(values, timestampMs) {
+      return values.map((v, i) => filters[i].filter(v, timestampMs));
     },
-
-    /** Clears all internal state — call after a meaningful tracking gap. */
     reset() {
-      xFilter.reset();
-      dxFilter.reset();
-      lastTimestampMs = null;
+      filters.forEach((f) => f.reset());
     },
   };
 }

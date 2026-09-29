@@ -1,7 +1,72 @@
 import React from 'react';
 import { AlertTriangle, Play, RotateCcw, Lightbulb, BookOpen, Globe } from 'lucide-react';
 
-export default function InterventionOverlay({ onResume, onHint, onExplain, onHinglish, onReplay, onExpand }) {
+// Maps StruggleEvent.event_type (set server-side by
+// struggle_monitor.py's determine_event_type() — see its own rule-based
+// logic) to a human-readable reason. Neither InterventionOverlay nor
+// MentorPanel showed this anywhere before — every auto-detected struggle
+// rendered the exact same generic copy ("might need a bit more time" /
+// "noticed pauses or inactivity") regardless of which of the five very
+// different underlying signals (sustained fixation, looking away,
+// rewinding repeatedly, pausing repeatedly, or being idle) actually fired.
+// That made it look, from the student's side, like the system flagged them
+// for no visible reason.
+const EVENT_TYPE_REASONS = {
+  gaze_fixation_spike: "you've been looking at the same spot on the screen for a while",
+  gaze_off_screen: "you've been looking away from the lesson for a while",
+  rewatch_spike: "you've rewound to this same part a couple of times",
+  pause_frequent: "you've paused a few times in a row",
+  idle_without_progress: "there hasn't been any activity for a while",
+  low_quiz_score: "your recent answers on this topic suggest it could use another look",
+  repeated_failed_attempts: "a few attempts haven't quite landed yet",
+  dsa_stuck: "you seem to be stuck on this problem",
+  question_confusion: "this question seems to be giving you some trouble",
+};
+
+export function getStruggleReasonText(eventType) {
+  return EVENT_TYPE_REASONS[eventType] || null;
+}
+
+export function getInterventionSeverity(event) {
+  // If backend provides a score, use it (assumes scores >= 50 are High severity)
+  if (event?.struggle_score !== undefined && event?.struggle_score !== null) {
+    return event.struggle_score >= 50 ? 'high' : 'low';
+  }
+  
+  // Default fallback: all detected backend events without a score are High severity
+  if (event?.detected) {
+    return 'high'; 
+  }
+  
+  // Frontend-only, non-critical events are Low severity
+  return 'low';
+}
+
+export default function InterventionOverlay({ onResume, onHint, onExplain, onHinglish, onReplay, onExpand, lessonTitle, severity = 'high', reasonText = null }) {
+  if (severity === 'low') {
+    return (
+      <div className="fixed bottom-6 left-6 z-50 bg-white border border-stone-200 rounded-xl shadow-xl p-4 max-w-sm flex gap-3 items-start animate-in fade-in slide-in-from-bottom-4">
+        <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0 mt-0.5">
+          <Lightbulb className="w-4 h-4 text-primary" />
+        </div>
+        <div className="flex-1">
+          <h3 className="text-sm font-semibold text-stone-800 mb-1">Need a hand?</h3>
+          <p className="text-xs text-stone-500 leading-relaxed mb-3">
+            You can always ask your AI mentor for a gentle hint or explanation if things get tricky.
+          </p>
+          <div className="flex gap-2">
+            <button onClick={() => { onHint(); onExpand(); }} className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-primary text-xs font-semibold rounded-lg transition-colors">
+              Ask Mentor
+            </button>
+            <button onClick={onResume} className="px-3 py-1.5 text-stone-500 hover:text-stone-700 text-xs font-medium rounded-lg transition-colors">
+              Dismiss
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -36,8 +101,20 @@ export default function InterventionOverlay({ onResume, onHint, onExplain, onHin
                 id="intervention-desc"
                 className="text-sm text-stone-500 leading-relaxed"
               >
-                It looks like Boltzmann's formula might need a bit more time. 
-                That's completely normal — this is one of the trickier ideas in thermodynamics. 
+                {reasonText ? (
+                  // Was always the two generic lines below regardless of
+                  // which signal actually fired (sustained fixation, off-
+                  // screen, rewinding, pausing, idle) — no way to tell why
+                  // this appeared. Now says the real reason when it's
+                  // known.
+                  <>We noticed {reasonText}
+                    {lessonTitle ? <> in <strong className="text-stone-700">&ldquo;{lessonTitle}&rdquo;</strong></> : ''}.{' '}</>
+                ) : lessonTitle ? (
+                  <>It looks like part of <strong className="text-stone-700">&ldquo;{lessonTitle}&rdquo;</strong> might need a bit more time.{' '}</>
+                ) : (
+                  <>It looks like you might be finding this section tricky.{' '}</>
+                )}
+                That&apos;s completely normal — even the best learners pause here.
                 How would you like to continue?
               </p>
             </div>
@@ -49,7 +126,7 @@ export default function InterventionOverlay({ onResume, onHint, onExplain, onHin
           {/* Primary action */}
           <button
             onClick={onResume}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-teal-700 text-white text-sm font-semibold rounded-xl hover:bg-teal-800 active:scale-[0.98] transition-all mb-3 focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:outline-none shadow-sm"
+            className="w-full flex items-center justify-center gap-2 py-3 bg-[var(--primary)] text-white text-sm font-semibold rounded-xl hover:opacity-90 active:scale-[0.98] transition-all mb-3 focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 focus-visible:outline-none shadow-sm"
             autoFocus
             aria-label="Resume the lesson"
           >
@@ -61,38 +138,38 @@ export default function InterventionOverlay({ onResume, onHint, onExplain, onHin
           <div className="grid grid-cols-2 gap-2 mb-2">
             <button
               onClick={() => { onHint(); onExpand(); }}
-              className="flex flex-col items-center gap-1.5 py-3 px-3 border border-stone-200 rounded-xl hover:bg-stone-50 hover:border-stone-300 transition-all group focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:outline-none"
-              aria-label="Get a hint from the AI mentor"
+              className="flex flex-col items-center gap-1.5 py-3 px-3 border border-border rounded-xl hover:bg-surface-soft hover:border-stone-300 transition-all group focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              aria-label="I need a hint"
             >
               <Lightbulb className="w-4 h-4 text-amber-500 group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-semibold text-stone-700">Give Hint</span>
+              <span className="text-xs font-semibold text-text">I need a hint</span>
             </button>
 
             <button
               onClick={() => { onExplain(); onExpand(); }}
-              className="flex flex-col items-center gap-1.5 py-3 px-3 border border-stone-200 rounded-xl hover:bg-stone-50 hover:border-stone-300 transition-all group focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:outline-none"
-              aria-label="Get a plain-language explanation"
+              className="flex flex-col items-center gap-1.5 py-3 px-3 border border-border rounded-xl hover:bg-surface-soft hover:border-stone-300 transition-all group focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              aria-label="Explain simply"
             >
-              <BookOpen className="w-4 h-4 text-teal-600 group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-semibold text-stone-700">Explain Simply</span>
+              <BookOpen className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-semibold text-text">Explain simply</span>
             </button>
 
             <button
               onClick={onReplay}
-              className="flex flex-col items-center gap-1.5 py-3 px-3 border border-stone-200 rounded-xl hover:bg-stone-50 hover:border-stone-300 transition-all group focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:outline-none"
-              aria-label="Replay the last 30 seconds"
+              className="flex flex-col items-center gap-1.5 py-3 px-3 border border-border rounded-xl hover:bg-surface-soft hover:border-stone-300 transition-all group focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              aria-label="Replay last 30s"
             >
-              <RotateCcw className="w-4 h-4 text-stone-500 group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-semibold text-stone-700">Replay Section</span>
+              <RotateCcw className="w-4 h-4 text-muted group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-semibold text-text">Replay last 30s</span>
             </button>
 
             <button
               onClick={() => { onHinglish(); onExpand(); }}
-              className="flex flex-col items-center gap-1.5 py-3 px-3 border border-stone-200 rounded-xl hover:bg-stone-50 hover:border-stone-300 transition-all group focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:outline-none"
-              aria-label="Ask the mentor in Hinglish"
+              className="flex flex-col items-center gap-1.5 py-3 px-3 border border-border rounded-xl hover:bg-surface-soft hover:border-stone-300 transition-all group focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              aria-label="Ask in Hinglish"
             >
-              <Globe className="w-4 h-4 text-indigo-500 group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-semibold text-stone-700">Ask in Hinglish</span>
+              <Globe className="w-4 h-4 text-secondary group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-semibold text-text">Ask in Hinglish</span>
             </button>
           </div>
         </div>

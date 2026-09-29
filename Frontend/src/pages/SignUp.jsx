@@ -2,6 +2,31 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, ChevronRight, Check, Loader2, GraduationCap, BookOpen, Building2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { api } from '../services/api';
+import { createUserWithEmailPassword, signInWithGoogle, updateFirebaseProfile, sendEmailVerificationToUser } from '../services/firebase';
+
+// Both catch blocks below previously did `err?.message || fallback` for
+// every failure, which dumps the raw Firebase SDK string verbatim (e.g.
+// "Firebase: Error (auth/network-request-failed).") for any code with no
+// specific case — including network-request-failed, whose most common
+// real-world cause is an ad-blocker/privacy extension blocking Google's
+// identity endpoints, not a dead connection. Login.jsx has the same
+// mapping for its own sign-in/Google flows.
+function friendlyFirebaseError(err, fallback) {
+  switch (err?.code) {
+    case 'auth/email-already-in-use':
+      return 'An account with this email already exists — try signing in instead.';
+    case 'auth/weak-password':
+      return 'Password is too weak. Use at least 8 characters.';
+    case 'auth/invalid-email':
+      return 'Enter a valid email address.';
+    case 'auth/network-request-failed':
+      return "Couldn't reach the sign-up service. Check your internet connection — an ad-blocker or privacy extension blocking Google's servers is a common cause — then try again.";
+    case 'auth/popup-closed-by-user':
+      return 'Sign-up cancelled.';
+    default:
+      return err?.message || fallback;
+  }
+}
 
 // ── Role config ───────────────────────────────────────────────────────────────
 const ROLES = [
@@ -41,7 +66,6 @@ function Field({ label, id, error, hint, children }) {
   );
 }
 
-// ── Input ─────────────────────────────────────────────────────────────────────
 function Input({ id, error, className = '', ...props }) {
   const base = 'w-full bg-white border rounded-xl px-4 py-3 text-sm text-stone-900 placeholder-stone-400 outline-none transition-all duration-150 focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500';
   const err  = error ? 'border-red-400 bg-red-50/30 focus:ring-red-400/20 focus:border-red-400' : 'border-stone-200 hover:border-stone-300';
@@ -63,6 +87,7 @@ export default function SignUp() {
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '', institution: '' });
   const [show, setShow] = useState({ password: false, confirm: false });
   const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [status, setStatus] = useState('idle'); // idle | loading | success
 
@@ -85,22 +110,51 @@ export default function SignUp() {
     ev.preventDefault();
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
+
+    setErrors({});
+    setSubmitError('');
     setStatus('loading');
+
     try {
-      await api.register(form.email, form.password, form.name, role);
-      await api.login(form.email, form.password);
+      const firebaseUser = await createUserWithEmailPassword(form.email, form.password);
+      await updateFirebaseProfile(firebaseUser, { displayName: form.name });
+      await sendEmailVerificationToUser(firebaseUser);
+
+      const token = await firebaseUser.getIdToken(/* forceRefresh */ true);
+      await api.firebaseLogin(token, { role, full_name: form.name });
+
       setStatus('success');
-      setTimeout(() => navigate('/onboarding'), 2000);
     } catch (err) {
+      setSubmitError(friendlyFirebaseError(err, 'Unable to create account.'));
       setStatus('idle');
-      setErrors({ email: err.message || 'Failed to create account. Email might be in use.' });
+    }
+  }
+
+  async function handleGoogle() {
+    setErrors({});
+    setSubmitError('');
+    setStatus('loading');
+
+    try {
+      const user = await signInWithGoogle();
+      const token = await user.getIdToken();
+      await api.firebaseLogin(token, { role, full_name: user.displayName || '' });
+      setStatus('success');
+    } catch (err) {
+      setSubmitError(friendlyFirebaseError(err, 'Google signup failed.'));
+      setStatus('idle');
     }
   }
 
   // ── Success state ─────────────────────────────────────────────────────────
   if (status === 'success') {
+    const destination =
+      role === 'student'    ? '/onboarding' :
+      role === 'instructor' ? '/instructor' :
+      role === 'admin'      ? '/admin' : '/dashboard';
+    
     return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center p-4">
+      <div className="min-h-screen app-bg flex items-center justify-center p-4">
         <div className="w-full max-w-sm bg-white border border-stone-200 rounded-2xl shadow-sm p-10 flex flex-col items-center gap-6 text-center">
           <div className="w-16 h-16 rounded-full bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center">
             <Check className="w-8 h-8 text-emerald-600" strokeWidth={2.5} />
@@ -109,7 +163,7 @@ export default function SignUp() {
             <h2 className="text-xl font-bold text-stone-900 mb-2">Account created!</h2>
             <p className="text-sm text-stone-500 leading-relaxed">Check your email to verify your address, then we'll set up your personalized learning space.</p>
           </div>
-          <button onClick={() => navigate('/select-role')} className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400">
+          <button onClick={() => navigate(destination)} className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400">
             Continue to setup <ChevronRight className="w-4 h-4" />
           </button>
         </div>
@@ -118,7 +172,7 @@ export default function SignUp() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 flex">
+    <div className="min-h-screen app-bg flex">
 
       {/* ── Left panel (hidden on mobile) ── */}
       <div className="hidden lg:flex lg:w-[42%] xl:w-[38%] bg-[#1C1917] flex-col justify-between p-10 xl:p-14 shrink-0">
@@ -188,10 +242,19 @@ export default function SignUp() {
             <p className="text-sm text-stone-500 leading-relaxed">Your role helps tailor the experience from day one.</p>
           </div>
 
+          {submitError && (
+            <div className="mb-5 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-800">
+              {submitError}
+            </div>
+          )}
+
           {/* Google CTA */}
           <button
             type="button"
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border border-stone-200 bg-white hover:bg-stone-50 hover:border-stone-300 text-sm font-semibold text-stone-700 transition-all shadow-sm mb-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
+            onClick={handleGoogle}
+            disabled={status === 'loading'}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border text-sm font-semibold transition-all shadow-sm mb-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 disabled:opacity-60 disabled:cursor-not-allowed"
+            style={{backgroundColor:'var(--surface)',borderColor:'var(--border)',color:'var(--text)'}}
           >
             <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -204,9 +267,9 @@ export default function SignUp() {
 
           {/* Divider */}
           <div className="flex items-center gap-3 mb-6">
-            <div className="flex-1 h-px bg-stone-200" />
-            <span className="text-xs text-stone-400 font-medium">or create with email</span>
-            <div className="flex-1 h-px bg-stone-200" />
+            <div className="flex-1 h-px" style={{backgroundColor:'var(--border)'}} />
+            <span className="text-xs font-medium" style={{color:'var(--text-muted)'}}>or create with email</span>
+            <div className="flex-1 h-px" style={{backgroundColor:'var(--border)'}} />
           </div>
 
           {/* Form */}
@@ -214,7 +277,7 @@ export default function SignUp() {
 
             {/* Role selector */}
             <div className="flex flex-col gap-2">
-              <span className="text-sm font-semibold text-stone-700">I am a</span>
+              <span className="text-sm font-semibold" style={{color:'var(--text-muted)'}}>I am a</span>
               <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Account role">
                 {ROLES.map(r => {
                   const active = role === r.id;
@@ -225,15 +288,15 @@ export default function SignUp() {
                       role="radio"
                       aria-checked={active}
                       onClick={() => setRole(r.id)}
-                      className={`flex flex-col items-center gap-1.5 px-3 py-3.5 rounded-xl border-2 text-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 ${
-                        active
-                          ? 'border-teal-600 bg-teal-50 text-teal-800'
-                          : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300 hover:text-stone-700'
-                      }`}
+                      className="flex flex-col items-center gap-1.5 px-3 py-3.5 rounded-xl border-2 text-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
+                      style={active
+                        ? {borderColor:'#0D9488',backgroundColor:'rgba(20,184,166,0.12)',color:'#5EEAD4'}
+                        : {borderColor:'var(--border)',backgroundColor:'var(--surface)',color:'var(--text-muted)'}
+                      }
                     >
-                      <r.icon className={`w-5 h-5 ${active ? 'text-teal-600' : 'text-stone-400'}`} strokeWidth={1.75} />
+                      <r.icon className={`w-5 h-5 ${active ? 'text-teal-400' : ''}`} style={active ? {} : {color:'var(--text-faint)'}} strokeWidth={1.75} />
                       <span className="text-xs font-semibold leading-none">{r.label}</span>
-                      <span className={`text-[10px] leading-none ${active ? 'text-teal-600' : 'text-stone-400'}`}>{r.desc}</span>
+                      <span className="text-[10px] leading-none" style={{color: active ? '#5EEAD4' : 'var(--text-faint)'}}>{r.desc}</span>
                     </button>
                   );
                 })}

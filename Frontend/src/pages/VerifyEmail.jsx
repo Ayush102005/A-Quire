@@ -31,7 +31,7 @@ export default function VerifyEmail() {
   }, [searchParams]);
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center px-4 py-12 font-sans">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12 font-sans" style={{backgroundColor:'var(--bg)'}}>
 
       {/* Background blobs */}
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 overflow-hidden">

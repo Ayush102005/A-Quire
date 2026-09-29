@@ -1,26 +1,20 @@
-from pydantic import BaseModel
+"""app/schemas/notification.py — Notification request/response schemas."""
+from __future__ import annotations
+
 from datetime import datetime
 
-
-class NotificationBase(BaseModel):
-    title: str
-    message: str
-    notification_type: str = "info"
+from pydantic import BaseModel, ConfigDict
 
 
-class NotificationCreate(NotificationBase):
-    pass
+class NotificationUpdate(BaseModel):
+    is_read: bool
 
 
-class NotificationResponse(NotificationBase):
+class NotificationResponse(BaseModel):
     id: int
     user_id: int
+    title: str
+    message: str
     is_read: bool
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
-
-
-class NotificationMarkRead(BaseModel):
-    is_read: bool = True
+    model_config = ConfigDict(from_attributes=True)

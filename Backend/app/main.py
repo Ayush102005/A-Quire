@@ -1,163 +1,128 @@
+"""
+app/main.py
+────────────
+FastAPI application factory for A-Quire Backend.
+WebSocket router mounted at root level (outside /api/v1 prefix).
+"""
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from typing import AsyncGenerator
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
-from slowapi.util import get_remote_address
 
+from app.api.v1.api import api_router
+from app.api.v1.ws import router as ws_router
 from app.core.config import settings
-from app.core.logging import logger
-
-# ── Routers ───────────────────────────────────────────────────────────────────
-from app.api.v1.health import router as health_router
-from app.api.v1.auth import router as auth_router
-from app.api.v1.users import router as users_router
-from app.api.v1.courses import router as courses_router
-from app.api.v1.lessons import router as lessons_router
-from app.api.v1.progress import router as progress_router
-from app.api.v1.struggles import router as struggles_router
-from app.api.v1.quiz import router as quiz_router
-from app.api.v1.notifications import router as notifications_router
-from app.api.v1.onboarding import router as onboarding_router
-from app.api.v1.analytics import router as analytics_router
-from app.api.v1.enrollments import router as enrollments_router
-
-# ── WebSocket ─────────────────────────────────────────────────────────────────
-from app.websocket.manager import manager
-from app.core.security import decode_token
+from app.core.firebase import init_firebase
+# Rate limiting is applied per-route via Depends() in app/core/rate_limit.py
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Startup / shutdown lifecycle hook."""
-    logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
-    
-    # Auto-migrate/create tables for SQLite
-    if settings.DATABASE_URL.startswith("sqlite"):
-        from app.core.database import engine, Base
-        # Import all models to register with Base.metadata
-        from app.models import user, course, progress, struggle, quiz, notification, onboarding, profile
-        
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("SQLite database tables created/verified.")
-        
-        # Seed mock data
-        from app.core.database import AsyncSessionLocal
-        from app.utils.seeder import seed_database
-        async with AsyncSessionLocal() as db:
-            await seed_database(db)
-            
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    init_firebase()
+    print(f"[OK] {settings.APP_NAME} started (debug={settings.DEBUG})")
     yield
-    logger.info("Shutting down gracefully")
+    print(f"[--] {settings.APP_NAME} shutting down...")
 
 
-app = FastAPI(
-    title=settings.APP_NAME,
-    version=settings.APP_VERSION,
-    description=(
-        "A-Quire — AI-powered adaptive learning platform API. "
-        "Provides authentication, course management, lesson progression, "
-        "real-time struggle event ingestion, AI mentor hints, and WebSocket notifications."
-    ),
-    docs_url="/docs",
-    redoc_url="/redoc",
-    lifespan=lifespan,
-)
-
-# ── Rate Limiter ─────────────────────────────────────────────────────────────
-limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-app.add_middleware(SlowAPIMiddleware)
-
-# ── CORS ──────────────────────────────────────────────────────────────────────
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.allowed_origins_list,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ── REST Routes ───────────────────────────────────────────────────────────────
-PREFIX = "/api/v1"
-
-app.include_router(health_router,        prefix=PREFIX)
-app.include_router(auth_router,          prefix=PREFIX)
-app.include_router(users_router,         prefix=f"{PREFIX}/users",         tags=["users"])
-app.include_router(courses_router,       prefix=PREFIX)
-app.include_router(lessons_router,       prefix=f"{PREFIX}/content",        tags=["lessons & modules"])
-app.include_router(lessons_router,       prefix=PREFIX,                     tags=["lessons & modules"])
-app.include_router(progress_router,      prefix=f"{PREFIX}/progress",       tags=["progress"])
-app.include_router(struggles_router,     prefix=f"{PREFIX}/struggles",      tags=["struggles"])
-app.include_router(quiz_router,          prefix=f"{PREFIX}/quizzes",        tags=["quizzes"])
-app.include_router(notifications_router, prefix=f"{PREFIX}/notifications",  tags=["notifications"])
-app.include_router(onboarding_router,    prefix=PREFIX)
-app.include_router(analytics_router,     prefix=f"{PREFIX}/analytics",      tags=["analytics"])
-app.include_router(enrollments_router,   prefix=PREFIX)
-
-
-# ── WebSocket ─────────────────────────────────────────────────────────────────
-@app.websocket("/ws/notifications")
-async def websocket_notifications(websocket: WebSocket):
-    """
-    Real-time notification channel.
-
-    Connect with:
-        ws://host/ws/notifications?token=<access_token>
-
-    The server sends JSON messages:
-        {"type": "notification", "data": {...}}
-        {"type": "mentor_hint",  "data": {...}}
-    """
-    token = websocket.query_params.get("token")
-    if not token:
-        await websocket.close(code=1008, reason="Token required")
-        return
-
-    payload = decode_token(token)
-    if not payload or payload.get("type") != "access":
-        await websocket.close(code=1008, reason="Invalid or expired token")
-        return
-
-    user_id = int(payload.get("sub", 0))
-    await manager.connect(user_id, websocket)
-    try:
-        await websocket.send_json({"type": "connected", "user_id": user_id})
-        while True:
-            # Keep connection alive; server pushes messages proactively
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        await manager.disconnect(user_id, websocket)
-        logger.info(f"WS disconnected: user_id={user_id}")
-
-
-# ── Root ──────────────────────────────────────────────────────────────────────
-@app.get("/", tags=["root"])
-async def root() -> dict:
-    return {
-        "name": settings.APP_NAME,
-        "version": settings.APP_VERSION,
-        "docs": "/docs",
-        "redoc": "/redoc",
-        "health": "/api/v1/health",
-        "websocket": "/ws/notifications?token=<access_token>",
-    }
-
-
-# ── Dev entry-point ───────────────────────────────────────────────────────────
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=settings.DEBUG,
-        reload_excludes=["*.db", "*.db-journal", "*.db-wal", "*.db-shm"],
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title=settings.APP_NAME,
+        version="1.0.0",
+        description="A-Quire — AI-powered adaptive learning platform REST API",
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
+        lifespan=lifespan,
     )
+
+    # In DEBUG mode allow any origin (dev convenience). In production, use the configured origins.
+    if settings.DEBUG:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_origin_regex=r".*",
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    else:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.allowed_origins_list,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+    # Security Headers and Request ID middlewares
+    from app.core.middleware import SecurityHeadersMiddleware, RequestIDMiddleware
+    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(RequestIDMiddleware)
+
+    # Versioned REST API
+    app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+    # WebSocket at root level (ws://host/ws/notifications)
+    app.include_router(ws_router)
+
+    @app.get("/", tags=["Root"])
+    async def root() -> dict:
+        return {"message": f"{settings.APP_NAME} is running 🚀"}
+
+    @app.get("/health", tags=["Health"])
+    async def health_check() -> dict:
+        """
+        Simple health check for infrastructure.
+        """
+        import sqlalchemy as sa
+        # app.core.database doesn't exist — the actual session factory lives
+        # in app.db.session as AsyncSessionLocal. This import failing raised
+        # unconditionally (outside the try/except below, which only guards
+        # the DB *query* itself), so /health 500'd on every single call
+        # instead of ever reporting a real db_ok/redis_ok status.
+        from app.db.session import AsyncSessionLocal
+        db_ok = False
+        try:
+            async with AsyncSessionLocal() as session:
+                await session.execute(sa.text("SELECT 1"))
+            db_ok = True
+        except Exception:
+            pass
+
+        # Since Celery uses Redis as a broker, we check if we can import and inspect it.
+        # conn.connect() is a synchronous, blocking kombu call with no
+        # timeout of its own — called directly on the event loop, an
+        # unreachable (rather than actively refused) Redis host doesn't
+        # fail fast, it hangs for however long the OS's own TCP connect
+        # timeout is (can be a minute-plus on some platforms), freezing
+        # this whole worker's event loop — every other request on it stalls
+        # too — for that entire time. Running it in a thread with an
+        # explicit short timeout bounds the damage to one slow health
+        # check instead of the whole process appearing to hang.
+        import asyncio
+        redis_ok = False
+        try:
+            from app.core.celery_app import celery_app
+
+            def _check_redis() -> None:
+                with celery_app.connection_for_read() as conn:
+                    conn.connect()
+
+            await asyncio.wait_for(asyncio.to_thread(_check_redis), timeout=2.0)
+            redis_ok = True
+        except Exception:
+            pass
+
+        return {
+            "status": "ok" if db_ok else "error",
+            "db": db_ok,
+            "redis": redis_ok,
+        }
+
+    return app
+
+
+app = create_app()

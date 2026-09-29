@@ -87,7 +87,7 @@ class TestLogin:
 
         resp = await client.post("/api/v1/auth/login", json={
             "email": email,
-            "password": "pass123",
+            "password": "pass1234",
         })
         assert resp.status_code == 200
         data = resp.json()
@@ -109,7 +109,7 @@ class TestLogin:
     async def test_login_nonexistent_user(self, client: AsyncClient):
         resp = await client.post("/api/v1/auth/login", json={
             "email": "ghost@example.com",
-            "password": "pass123",
+            "password": "pass1234",
         })
         assert resp.status_code == 401
 

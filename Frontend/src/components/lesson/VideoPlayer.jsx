@@ -1,210 +1,332 @@
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  Play, Pause, Volume2, VolumeX, Maximize2, RotateCcw,
-  SkipBack, SkipForward, Captions
-} from 'lucide-react';
+import React from 'react';
 
-function formatTime(seconds) {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
+// Create a promise that resolves when YouTube API is ready
+let apiReadyPromise = null;
+
+const getYouTubeApi = () => {
+  if (typeof window === 'undefined') return Promise.reject('No window');
+  
+  if (window.YT && window.YT.Player) {
+    return Promise.resolve(window.YT);
+  }
+
+  if (!apiReadyPromise) {
+    apiReadyPromise = new Promise((resolve) => {
+      window.onYouTubeIframeAPIReady = () => {
+        resolve(window.YT);
+      };
+
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      tag.async = true;
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    });
+  }
+
+  return apiReadyPromise;
+};
+
+function extractVideoId(src) {
+  if (!src) return null;
+  if (!(src.includes('youtube.com') || src.includes('youtu.be'))) return null;
+
+  let url;
+  try {
+    url = new URL(src);
+  } catch (err) {
+    return null;
+  }
+
+  let videoId = '';
+  const params = new URLSearchParams(url.search);
+
+  if (url.hostname.includes('youtu.be')) {
+    videoId = url.pathname.slice(1).split('?')[0];
+  } else if (url.pathname.startsWith('/watch')) {
+    videoId = params.get('v') || '';
+  } else if (url.pathname.startsWith('/shorts/')) {
+    videoId = url.pathname.split('/')[2] || '';
+  } else if (url.pathname.startsWith('/embed/')) {
+    videoId = url.pathname.split('/')[2] || '';
+  }
+
+  return videoId && videoId.length === 11 ? videoId : null;
 }
 
 export default function VideoPlayer({
-  isPlaying,
-  currentTime,
-  duration,
-  onPlayPause,
-  onSeek,
+  containerRef,
+  src,
+  videoRef,
+  iframeId,
   onTimeUpdate,
-  isStruggle,
-  captionsOn,
-  onToggleCaptions,
-  currentTranscriptText,
+  onDurationChange,
+  onEnded,
+  onPlay,
+  onPause,
+  speed = '1x',
+  isStruggle = false,
+  webcamStream = null,
+  initialTime = 0,
 }) {
-  const [volume, setVolume] = useState(1);
-  const [muted, setMuted] = useState(false);
-  const [showVolume, setShowVolume] = useState(false);
-  const [hoveringControls, setHoveringControls] = useState(false);
-  const [controlsVisible, setControlsVisible] = useState(true);
-  const progressRef = useRef(null);
-  const hideTimer = useRef(null);
+  const webcamRef = React.useRef(null);
+  const playerRef = React.useRef(null);
+  const playerIdRef = React.useRef(iframeId || `yt-player-${Date.now()}-${Math.random()}`);
+  const playerId = playerIdRef.current;
+  const timeIntervalRef = React.useRef(null);
+  const [isPlayerReady, setIsPlayerReady] = React.useState(false);
 
-  // Auto-hide controls
-  useEffect(() => {
-    if (!isPlaying || hoveringControls) {
-      setControlsVisible(true);
-      clearTimeout(hideTimer.current);
+  // Keep callback refs always current — lets us omit callbacks from effect deps
+  // to prevent the player from being destroyed/recreated when parent re-renders.
+  const onPlayRef = React.useRef(onPlay);
+  const onPauseRef = React.useRef(onPause);
+  const onEndedRef = React.useRef(onEnded);
+  const onTimeUpdateRef = React.useRef(onTimeUpdate);
+  const onDurationChangeRef = React.useRef(onDurationChange);
+  const videoRefRef = React.useRef(videoRef);
+  React.useEffect(() => { onPlayRef.current = onPlay; });
+  React.useEffect(() => { onPauseRef.current = onPause; });
+  React.useEffect(() => { onEndedRef.current = onEnded; });
+  React.useEffect(() => { onTimeUpdateRef.current = onTimeUpdate; });
+  React.useEffect(() => { onDurationChangeRef.current = onDurationChange; });
+  React.useEffect(() => { videoRefRef.current = videoRef; });
+  
+  const isYouTube = src && (src.includes('youtube.com') || src.includes('youtu.be'));
+  const videoId = isYouTube ? extractVideoId(src) : null;
+
+  // Initialize YouTube IFrame API player.
+  // IMPORTANT: Do NOT add callback props (onPlay, onPause, onEnded, videoRef)
+  // to this dependency array. They are accessed via refs so that a parent
+  // re-render never causes the player to be destroyed and re-created, which
+  // would produce two simultaneous audio streams (the "plays twice" bug).
+  React.useEffect(() => {
+    if (!isYouTube || !videoId || typeof window === 'undefined') return;
+
+    let mounted = true;
+
+    getYouTubeApi()
+      .then((YT) => {
+        if (!mounted) return;
+
+        const playerElement = document.getElementById(playerId);
+        if (!playerElement) return;
+
+        // Abort if the element was already converted to an iframe by YT (prevents
+        // double-init when React strict-mode runs the effect twice in dev).
+        if (playerElement.tagName === 'IFRAME') return;
+
+        // Clear any existing content
+        playerElement.innerHTML = '';
+
+        // Create and initialize player
+        const newPlayer = new YT.Player(playerId, {
+          videoId: videoId,
+          width: '100%',
+          height: '100%',
+          playerVars: {
+            autoplay: 0,
+            controls: 1,
+            modestbranding: 1,
+            rel: 0,
+            showinfo: 0,
+            iv_load_policy: 3,
+            enablejsapi: 1,
+            origin: window.location.origin,
+            start: Math.floor(initialTime),
+          },
+          events: {
+            onReady: (event) => {
+              if (!mounted) return;
+              // Store reference to the YouTube player for API calls
+              playerRef.current = event.target;
+              // Expose player via the forwarded ref (using current ref value)
+              if (videoRefRef.current) {
+                videoRefRef.current.current = event.target;
+              }
+              setIsPlayerReady(true);
+
+              // Apply speed immediately on ready
+              try {
+                const rate = parseFloat(speed.replace('x', ''));
+                if (!isNaN(rate) && event.target.setPlaybackRate) {
+                  event.target.setPlaybackRate(rate);
+                }
+              } catch (e) {
+                console.warn('Could not set initial playback rate:', e);
+              }
+            },
+            onStateChange: (event) => {
+              if (!mounted) return;
+              const YT = window.YT;
+              if (!YT) return;
+              
+              if (event.data === YT.PlayerState.PLAYING) {
+                onPlayRef.current?.();
+              } else if (event.data === YT.PlayerState.PAUSED) {
+                onPauseRef.current?.();
+              } else if (event.data === YT.PlayerState.ENDED) {
+                onEndedRef.current?.();
+              }
+            },
+            onError: (event) => {
+              console.error('YouTube player error:', event.data);
+            },
+          },
+        });
+        playerRef.current = newPlayer;
+      })
+      .catch((err) => {
+        console.error('Failed to load YouTube API:', err);
+      });
+
+    return () => {
+      mounted = false;
+      // Clear polling interval before destroying player to avoid a stale
+      // interval calling methods on the destroyed player.
+      if (timeIntervalRef.current) {
+        clearInterval(timeIntervalRef.current);
+        timeIntervalRef.current = null;
+      }
+      setIsPlayerReady(false);
+      if (playerRef.current?.destroy) {
+        try {
+          playerRef.current.destroy();
+        } catch (e) {
+          console.warn('Failed to destroy player:', e);
+        }
+        playerRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isYouTube, videoId, playerId]); // callbacks intentionally omitted — accessed via refs
+
+  React.useEffect(() => {
+    if (webcamRef.current && webcamStream) {
+      try {
+        webcamRef.current.srcObject = webcamStream;
+      } catch (e) {
+        console.warn('Failed to assign webcam stream to element', e);
+      }
+    }
+    return () => {
+      if (webcamRef.current) webcamRef.current.srcObject = null;
+    };
+  }, [webcamStream]);
+
+  // Handle speed changes for YouTube player
+  React.useEffect(() => {
+    if (!isYouTube || !playerRef.current || !playerRef.current.setPlaybackRate) {
       return;
     }
-    hideTimer.current = setTimeout(() => setControlsVisible(false), 3000);
-    return () => clearTimeout(hideTimer.current);
-  }, [isPlaying, hoveringControls, currentTime]);
+    
+    try {
+      // Convert "1x", "1.25x", etc. to number
+      const rate = parseFloat(speed.replace('x', ''));
+      if (!isNaN(rate)) {
+        playerRef.current.setPlaybackRate(rate);
+      }
+    } catch (e) {
+      console.error('Failed to set playback rate:', e);
+    }
+  }, [speed, isYouTube, isPlayerReady]);
 
-  const handleProgressClick = (e) => {
-    const rect = progressRef.current.getBoundingClientRect();
-    const pct = (e.clientX - rect.left) / rect.width;
-    onSeek(Math.round(pct * duration));
-  };
+  // Poll for time updates from YouTube player
+  React.useEffect(() => {
+    if (!isYouTube || !playerRef.current) return;
 
-  const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
+    // Clear any existing interval
+    if (timeIntervalRef.current) {
+      clearInterval(timeIntervalRef.current);
+    }
+
+    // Start polling for time updates every 500ms
+    timeIntervalRef.current = setInterval(() => {
+      if (playerRef.current && playerRef.current.getCurrentTime) {
+        try {
+          const currentTime = playerRef.current.getCurrentTime();
+          const duration = playerRef.current.getDuration ? playerRef.current.getDuration() : 0;
+          
+          // Use refs so this interval never holds stale closures
+          if (onTimeUpdateRef.current) {
+            onTimeUpdateRef.current({ target: { currentTime, duration } });
+          }
+          
+          if (onDurationChangeRef.current && duration > 0) {
+            onDurationChangeRef.current(duration);
+          }
+        } catch (e) {
+          console.warn('Failed to update time:', e);
+        }
+      }
+    }, 500);
+
+    return () => {
+      if (timeIntervalRef.current) {
+        clearInterval(timeIntervalRef.current);
+        timeIntervalRef.current = null;
+      }
+    };
+  }, [isYouTube, isPlayerReady]);
+
 
   return (
     <div
-      className={`relative w-full bg-stone-950 rounded-xl overflow-hidden shadow-2xl group
-        ${isStruggle ? 'ring-2 ring-amber-400/60' : ''}`}
+      ref={containerRef}
+      className={`relative w-full overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(20,184,166,0.16),transparent_55%),linear-gradient(135deg,#090b10_0%,#111827_45%,#05070b_100%)] shadow-[0_30px_90px_rgba(0,0,0,0.45)] ${isStruggle ? 'ring-2 ring-amber-400/60' : ''}`}
       style={{ aspectRatio: '16/9' }}
-      onMouseMove={() => setControlsVisible(true)}
     >
-      {/* Video placeholder — replace with actual <video> element */}
-      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-stone-900 via-stone-950 to-stone-900">
-        <div className="text-center select-none pointer-events-none">
-          <div className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-4">
-            <div className="text-white/20 text-5xl font-thin">∫</div>
-          </div>
-          <p className="text-white/20 text-sm font-medium">Intro to Entropy · 42 min</p>
-        </div>
-      </div>
-
-      {/* Struggle overlay — dim when paused for struggle */}
-      {isStruggle && (
-        <div className="absolute inset-0 bg-stone-950/50 pointer-events-none" />
-      )}
-
-      {/* Captions bar */}
-      {captionsOn && currentTranscriptText && (
-        <div className="absolute bottom-16 left-0 right-0 px-8 flex justify-center pointer-events-none">
-          <p className="bg-stone-950/80 text-white text-sm font-medium px-4 py-2 rounded-lg text-center max-w-2xl leading-relaxed">
-            {currentTranscriptText}
-          </p>
-        </div>
-      )}
-
-      {/* Controls overlay */}
-      <div
-        className={`absolute inset-x-0 bottom-0 transition-opacity duration-300 ${
-          controlsVisible || !isPlaying ? 'opacity-100' : 'opacity-0'
-        }`}
-        onMouseEnter={() => setHoveringControls(true)}
-        onMouseLeave={() => setHoveringControls(false)}
-      >
-        {/* Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none rounded-b-xl" />
-
-        <div className="relative px-4 pb-4 pt-8">
-          {/* Progress bar */}
-          <div
-            ref={progressRef}
-            className="w-full h-1 bg-white/20 rounded-full mb-3 cursor-pointer group/prog relative"
-            onClick={handleProgressClick}
-            role="slider"
-            aria-label="Video progress"
-            aria-valuemin={0}
-            aria-valuemax={duration}
-            aria-valuenow={currentTime}
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'ArrowRight') onSeek(Math.min(currentTime + 5, duration));
-              if (e.key === 'ArrowLeft') onSeek(Math.max(currentTime - 5, 0));
-            }}
-          >
+      <div className="absolute inset-0">
+        {src ? (
+          isYouTube ? (
             <div
-              className="h-full bg-teal-500 rounded-full transition-all"
-              style={{ width: `${progressPct}%` }}
+              id={playerId}
+              className="h-full w-full"
             />
-            <div
-              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow opacity-0 group-hover/prog:opacity-100 transition-opacity -ml-1.5"
-              style={{ left: `${progressPct}%` }}
-            />
-          </div>
-
-          {/* Control row */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              {/* Skip back 10s */}
-              <button
-                onClick={() => onSeek(Math.max(0, currentTime - 10))}
-                className="p-1.5 text-white/70 hover:text-white transition-colors rounded focus-visible:ring-2 focus-visible:ring-teal-400"
-                aria-label="Rewind 10 seconds"
-              >
-                <SkipBack className="w-4 h-4" />
-              </button>
-
-              {/* Play/Pause */}
-              <button
-                onClick={onPlayPause}
-                className="p-2 bg-white text-stone-900 rounded-full hover:bg-stone-100 transition-colors shadow-lg focus-visible:ring-2 focus-visible:ring-teal-400"
-                aria-label={isPlaying ? 'Pause' : 'Play'}
-              >
-                {isPlaying
-                  ? <Pause className="w-4 h-4 fill-current" />
-                  : <Play className="w-4 h-4 fill-current" />
+          ) : (
+            <video
+              ref={videoRef}
+              crossOrigin="anonymous"
+              preload="metadata"
+              src={src}
+              className="h-full w-full object-contain bg-black"
+              onTimeUpdate={onTimeUpdate}
+              onDurationChange={(e) => onDurationChange && onDurationChange(e.target.duration)}
+              onLoadedMetadata={(e) => {
+                if (initialTime > 0) {
+                  e.target.currentTime = initialTime;
                 }
-              </button>
-
-              {/* Skip forward 10s */}
-              <button
-                onClick={() => onSeek(Math.min(duration, currentTime + 10))}
-                className="p-1.5 text-white/70 hover:text-white transition-colors rounded focus-visible:ring-2 focus-visible:ring-teal-400"
-                aria-label="Forward 10 seconds"
-              >
-                <SkipForward className="w-4 h-4" />
-              </button>
-
-              {/* Time */}
-              <span className="text-white/60 text-xs font-mono tabular-nums ml-1">
-                {formatTime(currentTime)} / {formatTime(duration)}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1">
-              {/* Volume */}
-              <div className="relative flex items-center">
-                <button
-                  onClick={() => setMuted(!muted)}
-                  className="p-1.5 text-white/70 hover:text-white transition-colors rounded focus-visible:ring-2 focus-visible:ring-teal-400"
-                  aria-label={muted ? 'Unmute' : 'Mute'}
-                >
-                  {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                </button>
+              }}
+              onEnded={onEnded}
+              onPlay={onPlay}
+              onPause={onPause}
+              playsInline
+              controls
+            />
+          )
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-stone-900 via-stone-950 to-stone-900">
+            <div className="pointer-events-none select-none text-center">
+              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-white/5">
+                <div className="text-5xl font-thin text-white/20">∫</div>
               </div>
-
-              {/* Captions */}
-              <button
-                onClick={onToggleCaptions}
-                className={`p-1.5 rounded transition-colors focus-visible:ring-2 focus-visible:ring-teal-400 ${
-                  captionsOn ? 'text-teal-400' : 'text-white/50 hover:text-white'
-                }`}
-                aria-label={captionsOn ? 'Hide captions' : 'Show captions'}
-                aria-pressed={captionsOn}
-              >
-                <Captions className="w-4 h-4" />
-              </button>
-
-              {/* Fullscreen */}
-              <button
-                className="p-1.5 text-white/70 hover:text-white transition-colors rounded focus-visible:ring-2 focus-visible:ring-teal-400"
-                aria-label="Fullscreen"
-              >
-                <Maximize2 className="w-4 h-4" />
-              </button>
+              <p className="text-sm font-medium text-white/20">No video source</p>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Paused big play icon in center */}
-      {!isPlaying && !isStruggle && (
-        <button
-          onClick={onPlayPause}
-          className="absolute inset-0 flex items-center justify-center group/play"
-          aria-label="Play"
-          tabIndex={-1}
-        >
-          <div className="w-16 h-16 bg-white/10 border border-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all group-hover/play:scale-110 group-hover/play:bg-white/20">
-            <Play className="w-7 h-7 text-white fill-current ml-1" />
-          </div>
-        </button>
+      {isStruggle && <div className="pointer-events-none absolute inset-0 bg-stone-950/50" />}
+      {/* Webcam thumbnail */}
+      {webcamStream && (
+        <div className="absolute bottom-6 left-6 z-20">
+          <video
+            ref={webcamRef}
+            muted
+            playsInline
+            autoPlay
+            className="w-28 h-20 rounded-xl border-2 border-white/10 object-cover shadow-lg"
+          />
+        </div>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { connectNotifications } from '../services/api';
+import { api, connectNotifications, ensureFreshAccessToken } from '../services/api';
+import { renderInline } from '../utils/renderLiteMarkdown';
 import { X, Mail, Lightbulb, AlertTriangle, Sparkles } from 'lucide-react';
 
 const TOAST_CONFIG = {
@@ -28,21 +29,31 @@ export default function GlobalToaster() {
   const [toasts, setToasts] = useState([]);
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (!token) return;
+    let cancelled = false;
+    let ws = null;
 
-    const ws = connectNotifications(token, (msg) => {
-      if (msg.type === 'message' || msg.type === 'hint' || msg.type === 'alert') {
-        const id = Date.now().toString() + Math.random().toString();
-        setToasts(prev => [...prev, { id, ...msg, visible: true }]);
-        setTimeout(() => {
-          setToasts(prev => prev.filter(t => t.id !== id));
-        }, 5000); // Auto-dismiss after 5s
-      }
-    });
+    // Proactively refresh an expired access token before connecting — this
+    // effect only runs once at mount ([] deps), so a stale localStorage
+    // token here would otherwise fail the handshake for the entire session
+    // with no retry. See ensureFreshAccessToken() in services/api.js.
+    (async () => {
+      const token = await ensureFreshAccessToken();
+      if (cancelled || !token) return;
+
+      ws = connectNotifications(token, (msg) => {
+        if (msg.type === 'message' || msg.type === 'hint' || msg.type === 'alert') {
+          const id = Date.now().toString() + Math.random().toString();
+          setToasts(prev => [...prev, { id, ...msg, visible: true }]);
+          setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== id));
+          }, 5000); // Auto-dismiss after 5s
+        }
+      });
+    })();
 
     return () => {
-      try { ws.close(); } catch (e) {}
+      cancelled = true;
+      try { ws?.close(); } catch (e) {}
     };
   }, []);
 
@@ -89,11 +100,25 @@ export default function GlobalToaster() {
                 {toast.title || (isHint ? '✨ New AI Mentor Hint' : 'New Notification')}
               </h4>
               <p className="text-xs text-[var(--text-muted)] line-clamp-2 whitespace-pre-wrap leading-relaxed">
-                {text}
+                {renderInline(text, `toast-${toast.id}`)}
               </p>
               {action && (
                 <Link
                   to={action}
+                  onClick={() => {
+                    // Was a plain navigation link with no read-tracking at
+                    // all — clicking it left the underlying Notification
+                    // row (and its badge count) showing unread forever,
+                    // unlike the already-fixed equivalent on the
+                    // Notifications page. notification_id is only present
+                    // on pushes that persisted a Notification alongside
+                    // the live toast (see instructor_analytics.py's
+                    // perform_student_operation) — older push sites that
+                    // don't include it just skip this, same as before.
+                    if (toast.notification_id) {
+                      api.notifications.markRead(toast.notification_id).catch(() => {});
+                    }
+                  }}
                   className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-teal-700 hover:text-teal-800 hover:underline transition-colors focus-visible:outline-none"
                 >
                   Join Meeting →

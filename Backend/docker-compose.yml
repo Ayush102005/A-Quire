@@ -6,10 +6,22 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: aquire
-      POSTGRES_PASSWORD: aquire
+      # Was hardcoded to "aquire" (same as the username) directly in this
+      # committed file — a real, guessable credential shipped in source
+      # control, on top of being published to the host below. Now sourced
+      # from POSTGRES_PASSWORD in .env (docker compose auto-loads a .env
+      # file in this same directory for ${...} substitution — see
+      # https://docs.docker.com/compose/environment-variables/). Generate
+      # one with: python -c "import secrets; print(secrets.token_urlsafe(24))"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
       POSTGRES_DB: aquire_db
-    ports:
-      - "5432:5432"
+    # No `ports:` here on purpose — publishing 5432 to the host put Postgres
+    # on the public network interface of whatever VM runs this, reachable
+    # by anyone who can reach that IP, not just the backend/celery
+    # containers (which already reach it over the internal compose network
+    # by service name — no port publish needed for that). If you need
+    # host-side access for local debugging, add "127.0.0.1:5432:5432"
+    # (loopback-only), never a bare "5432:5432".
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -23,8 +35,7 @@ services:
     image: redis:7-alpine
     container_name: aquire_redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    # Same reasoning as postgres above — no ports published to the host.
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -40,10 +51,15 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://aquire:aquire@postgres:5432/aquire_db
+      DATABASE_URL: postgresql+asyncpg://aquire:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@postgres:5432/aquire_db
       REDIS_URL: redis://redis:6379/0
-    ports:
-      - "8000:8000"
+    # No ports: published to the host — caddy (below) is the only thing
+    # that talks to this container from outside, over the internal compose
+    # network by service name (http://backend:8000). Plain HTTP on the open
+    # internet would send login credentials and JWTs unencrypted; caddy
+    # terminates real TLS on 443 and reverse-proxies here instead.
+    expose:
+      - "8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,7 +79,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://aquire:aquire@postgres:5432/aquire_db
+      DATABASE_URL: postgresql+asyncpg://aquire:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@postgres:5432/aquire_db
       REDIS_URL: redis://redis:6379/0
     depends_on:
       postgres:
@@ -74,5 +90,27 @@ services:
       - ./firebase-credentials.json:/app/firebase-credentials.json:ro
     command: celery -A app.core.celery_app worker --loglevel=info --concurrency=2
 
+  # ── Caddy (reverse proxy + automatic HTTPS) ─────────────────────────────────
+  # Terminates real TLS for api.yourdomain.com — Caddy requests and renews the
+  # Let's Encrypt certificate itself, entirely from the Caddyfile below, no
+  # certbot/cron setup needed. Also forwards WebSocket upgrades (used by
+  # /ws/notifications) transparently; reverse_proxy handles that by default,
+  # nothing extra to configure for it.
+  caddy:
+    image: caddy:2-alpine
+    container_name: aquire_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"   # required for Let's Encrypt's HTTP-01 challenge
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # persists the issued certificate across restarts
+      - caddy_config:/config
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:

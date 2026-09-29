@@ -1,4 +1,4 @@
-# Next Permutation
+    # Next Permutation
 
 - **Topic:** Binary Search Tree Part-II
 - **Difficulty:** Medium

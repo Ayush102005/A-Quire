@@ -14,7 +14,7 @@ export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#F8F7F4] text-stone-900 font-sans">
+    <div className="min-h-screen text-stone-900 font-sans" style={{backgroundColor:'var(--bg)'}}>
 
       {/* ── Navigation ── */}
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-stone-200/70 shadow-sm">
@@ -76,11 +76,11 @@ export default function Home() {
               <h1 className="text-5xl md:text-7xl font-black tracking-tight leading-[1.05] mb-6 text-white">
                 Real-time AI intervention<br />
                 <span className="bg-gradient-to-r from-teal-300 via-teal-400 to-emerald-300 bg-clip-text text-transparent">
-                  for every lecture.
+                  for DSA, JEE, NEET & GATE.
                 </span>
               </h1>
               <p className="text-lg md:text-xl text-slate-400 leading-relaxed max-w-2xl mx-auto">
-                A-Quire detects struggle during video lectures and triggers Socratic AI guidance — ensuring no student falls behind silently.
+                A-Quire detects struggle during your prep lectures and triggers Socratic AI guidance — ensuring no aspirant falls behind silently.
               </p>
             </div>
 
@@ -180,7 +180,7 @@ export default function Home() {
 
             <div className="grid md:grid-cols-3 gap-8">
               {[
-                { step: '01', icon: PlayCircle, title: 'Watch & Learn', desc: 'Students engage with video coursework via our custom player with dynamic transcripts and timeline markers.', color: 'teal' },
+                { step: '01', icon: PlayCircle, title: 'Watch & Learn', desc: 'Students engage with prep lectures via our custom player with dynamic transcripts and timeline markers.', color: 'teal' },
                 { step: '02', icon: BrainCircuit, title: 'Struggle Detection', desc: 'Secure, local analysis notices when focus drops, replays occur, or confusion patterns arise during a lecture.', color: 'violet' },
                 { step: '03', icon: BookOpen, title: 'Learning Recovery', desc: 'The AI Mentor panel opens with Socratic questions that guide the student to the answer organically.', color: 'emerald' },
               ].map(({ step, icon: Icon, title, desc, color }) => (
@@ -202,7 +202,7 @@ export default function Home() {
         </section>
 
         {/* ── Benefits ── */}
-        <section className="py-28 bg-[#F8F7F4]">
+        <section className="py-28" style={{backgroundColor:'var(--bg)'}}>
           <div className="max-w-7xl mx-auto px-6">
             <div className="grid md:grid-cols-2 gap-16 items-start">
               {/* Students */}

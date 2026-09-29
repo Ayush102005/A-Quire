@@ -1,147 +1,195 @@
+"""app/schemas/course.py — Schemas for courses, modules, and lessons."""
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
-from pydantic import BaseModel, field_validator
-
-
-# ── Lesson ─────────────────────────────────────────────────────────────────────
-
-class LessonBase(BaseModel):
-    title: str
-    description: Optional[str] = None
-    video_url: Optional[str] = None
-    order: int = 0
-    duration_seconds: int = 0
-
-    model_config = {"str_strip_whitespace": True}
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class LessonCreate(LessonBase):
-    module_id: Optional[int] = None
+# ── Lesson schemas ─────────────────────────────────────────────────────────
 
-    @field_validator("title")
-    @classmethod
-    def validate_title(cls, v: str) -> str:
-        if not v or len(v) > 255:
-            raise ValueError("Title must be between 1 and 255 characters")
-        return v
+class LessonCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255, strip_whitespace=True)
+    video_url: str | None = Field(None, max_length=2000, strip_whitespace=True)
+    description: str | None = Field(None, max_length=2000, strip_whitespace=True)
+    order: int = Field(default=1, ge=1)
+    duration_seconds: int = Field(default=0, ge=0)
+    # Must match Lesson.lesson_type's actual documented/used values (see
+    # app/models/lesson.py) — this pattern previously allowed
+    # video/reading/interactive, none of which "interactive" or "reading"
+    # anything in the app ever sends, while "dsa" (which the instructor
+    # dashboard's DSA-lesson form actually sends — see LessonList in
+    # InstructorDashboard.jsx) was rejected outright, breaking every DSA
+    # lesson creation with a 422.
+    lesson_type: str = Field(default="video", pattern="^(video|dsa|jee|neet)$")
+    problem_id: str | None = Field(None, max_length=50, strip_whitespace=True)
+    category: str | None = Field(None, max_length=50, strip_whitespace=True)
+    difficulty: str | None = Field(None, pattern="^(Easy|Medium|Hard)$")
+    topic: str | None = Field(None, max_length=50, strip_whitespace=True)
+    problem_statement: str | None = Field(None, strip_whitespace=True)
+    examples: str | None = Field(None, strip_whitespace=True)
+    constraints: str | None = Field(None, strip_whitespace=True)
+    approaches: str | None = Field(None, strip_whitespace=True)
+    code_solutions: str | None = Field(None, strip_whitespace=True)
+    complexity_time: str | None = Field(None, max_length=50, strip_whitespace=True)
+    complexity_space: str | None = Field(None, max_length=50, strip_whitespace=True)
+    external_links: str | None = Field(None, strip_whitespace=True)
+    transcript: list[dict] | None = None
+    notes_content: str | None = Field(None, strip_whitespace=True)
 
 
 class LessonUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    video_url: Optional[str] = None
-    order: Optional[int] = None
-    duration_seconds: Optional[int] = None
+    title: str | None = Field(None, min_length=1, max_length=255, strip_whitespace=True)
+    video_url: str | None = Field(None, max_length=2000, strip_whitespace=True)
+    description: str | None = Field(None, max_length=2000, strip_whitespace=True)
+    order: int | None = Field(None, ge=1)
+    duration_seconds: int | None = Field(None, ge=0)
+    lesson_type: str | None = Field(None, pattern="^(video|dsa|jee|neet)$")
+    problem_id: str | None = Field(None, max_length=50, strip_whitespace=True)
+    category: str | None = Field(None, max_length=50, strip_whitespace=True)
+    difficulty: str | None = Field(None, pattern="^(Easy|Medium|Hard)$")
+    topic: str | None = Field(None, max_length=50, strip_whitespace=True)
+    problem_statement: str | None = Field(None, strip_whitespace=True)
+    examples: str | None = Field(None, strip_whitespace=True)
+    constraints: str | None = Field(None, strip_whitespace=True)
+    approaches: str | None = Field(None, strip_whitespace=True)
+    code_solutions: str | None = Field(None, strip_whitespace=True)
+    complexity_time: str | None = Field(None, max_length=50, strip_whitespace=True)
+    complexity_space: str | None = Field(None, max_length=50, strip_whitespace=True)
+    external_links: str | None = Field(None, strip_whitespace=True)
+    transcript: list[dict] | None = None
+    notes_content: str | None = Field(None, strip_whitespace=True)
 
-    model_config = {"str_strip_whitespace": True}
 
-
-class LessonResponse(LessonBase):
+class LessonResponse(BaseModel):
     id: int
     module_id: int
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-# ── Module ─────────────────────────────────────────────────────────────────────
-
-class ModuleBase(BaseModel):
     title: str
-    description: Optional[str] = None
-    order: int = 0
+    video_url: str | None
+    description: str | None
+    order: int
+    duration_seconds: int
+    lesson_type: str
+    problem_id: str | None
+    category: str | None = None
+    difficulty: str | None = None
+    topic: str | None = None
+    problem_statement: str | None = None
+    examples: str | None = None
+    constraints: str | None = None
+    approaches: str | None = None
+    code_solutions: str | None = None
+    complexity_time: str | None = None
+    complexity_space: str | None = None
+    external_links: str | None = None
+    transcript: list[dict] | None = None
+    pdf_filename: str | None = None
+    notes_content: str | None = None
+    model_config = ConfigDict(from_attributes=True)
 
-    model_config = {"str_strip_whitespace": True}
+
+class ContentLessonResponse(BaseModel):
+    id: int
+    module_id: int
+    title: str
+    video_url: str | None
+    description: str | None
+    order: int
+    duration_seconds: int
+    lesson_type: str
+    problem_id: str | None
+    category: str | None = None
+    difficulty: str | None = None
+    topic: str | None = None
+    problem_statement: str | None = None
+    examples: str | None = None
+    constraints: str | None = None
+    approaches: str | None = None
+    code_solutions: str | None = None
+    complexity_time: str | None = None
+    complexity_space: str | None = None
+    external_links: str | None = None
+    transcript: list[dict] | None = None
+    pdf_filename: str | None = None
+    notes_content: str | None = None
+    module_title: str | None
+    course_title: str | None
+    # Was missing entirely — LessonPlayer.jsx already reads
+    # lessonRef.current?.course_id (falling back to a route param when
+    # absent), but this field never actually existed on the response, so
+    # that read was always undefined. DsaProblemPage.tsx never had a
+    # course_id source at all (its route, /dsa/:id, carries no courseId
+    # param), so every struggle-monitor call it made left
+    # StruggleEvent.course_id NULL — invisible to every instructor
+    # dashboard query that filters by course_id (Recent Activity, Total
+    # Struggles, AI Interventions, Resolution Rate, At-Risk Students all
+    # do). The lesson-hotspot table was unaffected (it joins through
+    # lesson_id/problem_id, not course_id), which is why Two Sum could show
+    # up there but never in Recent Activity.
+    course_id: int | None = None
+    is_owner: bool = False
+    model_config = ConfigDict(from_attributes=True)
 
 
-class ModuleCreate(ModuleBase):
-    course_id: Optional[int] = None
+# ── Module schemas ─────────────────────────────────────────────────────────
 
-    @field_validator("title")
-    @classmethod
-    def validate_title(cls, v: str) -> str:
-        if not v or len(v) > 255:
-            raise ValueError("Title must be between 1 and 255 characters")
-        return v
+class ModuleCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255, strip_whitespace=True)
+    description: str | None = Field(None, max_length=2000, strip_whitespace=True)
+    order: int = Field(default=1, ge=1)
 
 
 class ModuleUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    order: Optional[int] = None
-
-    model_config = {"str_strip_whitespace": True}
+    title: str | None = Field(None, min_length=1, max_length=255, strip_whitespace=True)
+    description: str | None = Field(None, max_length=2000, strip_whitespace=True)
+    order: int | None = Field(None, ge=1)
 
 
-class ModuleResponse(ModuleBase):
+class ModuleResponse(BaseModel):
     id: int
     course_id: int
-    lessons: list[LessonResponse] = []
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-# ── Course ─────────────────────────────────────────────────────────────────────
-
-class CourseBase(BaseModel):
     title: str
-    description: Optional[str] = None
+    description: str | None
+    order: int
+    lessons: list[LessonResponse] = []
+    model_config = ConfigDict(from_attributes=True)
 
-    model_config = {"str_strip_whitespace": True}
 
+# ── Course schemas ─────────────────────────────────────────────────────────
 
-class CourseCreate(CourseBase):
-    @field_validator("title")
-    @classmethod
-    def validate_title(cls, v: str) -> str:
-        if not v or len(v) > 255:
-            raise ValueError("Title must be between 1 and 255 characters")
-        return v
+class CourseCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255, strip_whitespace=True)
+    description: str | None = Field(None, max_length=2000, strip_whitespace=True)
+    exam_category: str = Field(default="Other", max_length=50, strip_whitespace=True)
 
 
 class CourseUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-
-    model_config = {"str_strip_whitespace": True}
-
-
-class PublishToggleRequest(BaseModel):
-    is_published: bool
+    title: str | None = Field(None, min_length=1, max_length=255, strip_whitespace=True)
+    description: str | None = Field(None, max_length=2000, strip_whitespace=True)
+    exam_category: str | None = Field(None, max_length=50, strip_whitespace=True)
 
 
-# ── Course Response ────────────────────────────────────────────────────────────
-
-class CourseResponse(CourseBase):
-    id: int
-    instructor_id: int
-    is_published: bool
-    modules: list[ModuleResponse] = []
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-class CourseDetailResponse(CourseResponse):
-    """Detailed course response with all nested data"""
-    pass
-
-
-class CourseListResponse(BaseModel):
-    """Lightweight course list response"""
+class CourseResponse(BaseModel):
     id: int
     title: str
-    description: Optional[str] = None
-    instructor_id: int
+    description: str | None
+    exam_category: str
     is_published: bool
+    instructor_id: int | None
+    instructor_name: str | None = None
     created_at: datetime
+    modules: list[ModuleResponse] = []
+    model_config = ConfigDict(from_attributes=True)
 
-    model_config = {"from_attributes": True}
 
+class CourseListItem(BaseModel):
+    """Lightweight course summary for list endpoints."""
+    id: int
+    title: str
+    description: str | None
+    exam_category: str
+    is_published: bool
+    instructor_id: int | None
+    instructor_name: str | None = None
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)

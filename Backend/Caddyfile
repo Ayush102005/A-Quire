@@ -1,0 +1,13 @@
+# Caddy reverse proxy — see docker-compose.yml's caddy service.
+#
+# Replace api.yourdomain.com with your real backend domain before deploying
+# (must already point at this EC2 instance's public IP via a DNS A record —
+# Caddy's automatic HTTPS needs that to succeed the Let's Encrypt challenge
+# on first start; it will retry/log an error otherwise, not crash).
+api.yourdomain.com {
+	# X-Forwarded-For is set automatically by Caddy's reverse_proxy — the
+	# backend's rate limiter (app/core/rate_limit.py) reads it to see real
+	# client IPs instead of this container's internal one. No extra
+	# directive needed here for that; it's the reverse_proxy default.
+	reverse_proxy backend:8000
+}

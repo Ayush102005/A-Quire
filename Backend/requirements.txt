@@ -1,6 +1,7 @@
 # Web framework
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
+python-multipart>=0.0.32
 
 # Database
 sqlalchemy>=2.0.25
@@ -16,6 +17,14 @@ email-validator>=2.1.0
 # Auth
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
+firebase-admin>=7.5.0
+# RS256 JWT signing for JaaS video meeting auth (app/api/v1/meetings.py) —
+# already present transitively via firebase-admin's own dependency chain,
+# but declared explicitly so it doesn't silently break if that changes.
+pyjwt[crypto]>=2.10.1
+
+# YouTube transcript fetching (app/utils/youtube.py)
+youtube-transcript-api>=1.2.4
 
 # Rate limiting
 slowapi>=0.1.9
@@ -24,7 +33,8 @@ slowapi>=0.1.9
 redis>=5.0.1
 celery>=5.3.6
 
-# AWS Bedrock + SES
+# Anthropic API + SES/Polly
+anthropic>=0.49.0
 boto3>=1.34.14
 
 # WebSockets

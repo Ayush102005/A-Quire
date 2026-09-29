@@ -4,10 +4,13 @@ import {
   Home, BookOpen, Video, BrainCircuit, LineChart, Bell, User, Settings,
   Search, Menu, X, PlayCircle, Clock, CheckCircle2,
   ChevronRight, AlertCircle, Sparkles, BookX, Target, Zap,
-  RefreshCw, TrendingUp
+  RefreshCw, TrendingUp, Code2,
 } from "lucide-react";
-import { api, getCurrentUser } from "../services/api";
+import { api, getCurrentUser, getAccessToken, connectNotifications } from "../services/api";
 import ThemeToggle from "../components/ThemeToggle";
+import UserAvatar from "../components/UserAvatar";
+import { EmptyState } from "../components/UXStates";
+import { lessonPath } from "../utils/navigation";
 
 /* ─── Helpers ──────────────────────────────────────────────────────────────── */
 function timeAgo(dateStr) {
@@ -20,30 +23,7 @@ function timeAgo(dateStr) {
 }
 
 /* ─── Layout ────────────────────────────────────────────────────────────────── */
-function Sidebar({ navItems, isMobile, onNavigate }) {
-  return (
-    <div className={`flex flex-col h-screen min-h-screen sidebar-light ${isMobile ? "p-4" : "w-64 p-6 hidden lg:flex"}`}>
-      {!isMobile && (
-        <a href="/" className="inline-flex items-center gap-2 mb-10 pl-2">
-          <div className="w-8 h-8 rounded bg-teal-700 text-white flex items-center justify-center font-bold text-lg shadow-sm">A</div>
-          <span className="font-semibold text-xl tracking-tight text-stone-800">A-Quire</span>
-        </a>
-      )}
-      <div className="space-y-1 flex-1">
-        {navItems.map((item) => (
-          <Link key={item.name} to={item.href} onClick={() => isMobile && onNavigate?.()} className={`sidebar-nav-item ${item.active ? "active" : ""}`}>
-            <item.icon className="w-4 h-4 shrink-0" />
-            {item.name}
-          </Link>
-        ))}
-      </div>
-      <div className="mt-auto space-y-0.5 pt-4 border-t border-[#1E2130]">
-        <Link to="/settings" onClick={() => isMobile && onNavigate?.()} className="sidebar-nav-item"><User className="w-4 h-4 shrink-0" /> Profile</Link>
-        <Link to="/settings" onClick={() => isMobile && onNavigate?.()} className="sidebar-nav-item"><Settings className="w-4 h-4 shrink-0" /> Settings</Link>
-      </div>
-    </div>
-  );
-}
+import StudentSidebar from "../components/StudentSidebar";
 
 function Header({ user, onOpenMobileMenu, unreadCount = 0 }) {
   // Gracefully handle the case where full_name was stored as the email address
@@ -81,9 +61,7 @@ function Header({ user, onOpenMobileMenu, unreadCount = 0 }) {
               <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-teal-500 border border-white" aria-label={`${unreadCount} unread`} />
             )}
           </Link>
-          <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center border border-teal-200 ml-1">
-            <span className="text-sm font-bold text-teal-800">{initials}</span>
-          </div>
+          <UserAvatar className="ml-1" />
         </div>
       </div>
     </header>
@@ -111,12 +89,10 @@ export default function StudentDashboard() {
   const [loadingStruggles, setLoadingStruggles] = useState(true);
 
   const navItems = [
-    { name: "Dashboard", icon: Home, active: true, href: "/dashboard" },
-    { name: "My Courses", icon: BookOpen, active: false, href: "/courses" },
-    { name: "Live Lessons", icon: Video, active: false, href: "/lesson" },
-    { name: "AI Mentor", icon: BrainCircuit, active: false, href: "/progress" },
-    { name: "Progress", icon: LineChart, active: false, href: "/progress" },
-    { name: "Notifications", icon: Bell, active: false, href: "/notifications" },
+    { name: "Dashboard",     icon: Home,         active: true,  href: "/dashboard" },
+    { name: "My Courses",    icon: BookOpen,     active: false, href: "/courses"   },
+    { name: "Progress",      icon: LineChart,    active: false, href: "/progress"  },
+    { name: "Notifications", icon: Bell,         active: false, href: "/notifications" },
   ];
 
   const fetchAll = useCallback(async () => {
@@ -190,7 +166,7 @@ export default function StudentDashboard() {
     return (
       <section className="bg-[var(--card-bg)] rounded-2xl p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-8 border border-[var(--border)] shadow-sm relative overflow-hidden">
         <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-teal-600 rounded-l-2xl" />
-        <div className="absolute right-0 top-0 w-64 h-64 bg-gradient-to-bl from-teal-50 to-transparent opacity-50 pointer-events-none rounded-tr-2xl" />
+        <div className="absolute -right-20 -top-20 w-96 h-96 bg-teal-400/20 dark:bg-teal-900/30 blur-3xl pointer-events-none rounded-full" />
         <div className="flex-1 relative z-10 w-full">
           <div className="flex items-center gap-2 mb-2">
             <span className="bg-teal-50 text-teal-700 text-xs font-bold uppercase tracking-wider px-2 py-1 rounded">Up Next</span>
@@ -208,10 +184,10 @@ export default function StudentDashboard() {
           </div>
         </div>
         <div className="flex flex-col sm:flex-row w-full md:w-auto gap-3 relative z-10 shrink-0">
-          <button className="px-6 py-3 bg-[var(--card-bg)] border border-[var(--border)] text-[var(--text)] font-medium rounded-xl hover:bg-[var(--surface)] transition-colors shadow-sm flex items-center justify-center gap-2">
+          <button className="px-6 py-3 bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] font-medium rounded-xl hover:bg-[var(--surface-2)] transition-colors shadow-sm flex items-center justify-center gap-2">
             <BrainCircuit className="w-5 h-5 text-teal-700" /> Consult AI Mentor
           </button>
-          <Link to={cl.lesson_id ? `/lesson?id=${cl.lesson_id}` : "/courses"} className="px-6 py-3 bg-teal-700 text-white font-medium rounded-xl hover:bg-teal-800 transition-colors shadow-sm flex items-center justify-center gap-2">
+          <Link to={cl.lesson_id ? lessonPath(cl.lesson_id, cl.course_id, cl.lesson_type) : "/courses"} className="px-6 py-3 bg-teal-700 text-white font-medium rounded-xl hover:bg-teal-800 transition-colors shadow-sm flex items-center justify-center gap-2">
             <PlayCircle className="w-5 h-5" /> Resume Lesson
           </Link>
         </div>
@@ -246,11 +222,11 @@ export default function StudentDashboard() {
   function renderCourses() {
     if (loadingCourses) return <div className="grid sm:grid-cols-2 gap-4"><Skeleton h="h-32" /><Skeleton h="h-32" /></div>;
     if (!courses?.length) return (
-      <div className="flex flex-col items-center justify-center p-10 text-center bg-[var(--card-bg)] border border-dashed border-[var(--border)] rounded-xl">
-        <BookOpen className="w-8 h-8 text-stone-300 mb-3" />
-        <p className="text-sm font-medium text-stone-600">No active courses yet</p>
-        <Link to="/courses" className="text-sm text-teal-700 font-medium hover:underline mt-3">Browse courses →</Link>
-      </div>
+      <EmptyState 
+        title="No enrolled courses"
+        message="You haven't enrolled in any courses yet. Browse courses to get started."
+        action={<Link to="/courses" className="px-5 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800 transition-colors inline-block font-medium">Browse Courses</Link>}
+      />
     );
     return (
       <div className="grid sm:grid-cols-2 gap-4">
@@ -290,46 +266,69 @@ export default function StudentDashboard() {
         No AI interventions yet — they appear here when you get stuck during a lesson.
       </div>
     );
+
+    // Build a flat lesson_id → title map from enrolled courses data
+    const lessonTitleMap = {};
+    (courses ?? []).forEach(c => {
+      if (c.lessons) {
+        c.lessons.forEach(l => { lessonTitleMap[l.lesson_id] = l.title; });
+      }
+    });
+
     return (
       <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-sm overflow-hidden text-sm">
         <div className="grid grid-cols-12 gap-4 p-4 border-b border-[var(--border)] bg-[var(--surface)] font-medium text-[var(--text-muted)]">
           <div className="col-span-5">Lesson</div>
-          <div className="col-span-4">Score / Detail</div>
+          <div className="col-span-4">When / Score</div>
           <div className="col-span-3 text-right">Status</div>
         </div>
-        {struggles.map((e, i) => (
-          <div key={e.id ?? i} className={`grid grid-cols-12 gap-4 p-4 items-center ${i < struggles.length - 1 ? "border-b border-stone-100" : ""}`}>
-            <div className="col-span-5 font-medium text-stone-900 truncate">Lesson #{e.lesson_id}</div>
-            <div className="col-span-4 text-stone-600 truncate">Score: {e.struggle_score?.toFixed(2) ?? "—"}</div>
-            <div className="col-span-3 flex justify-end">
-              {e.hint_text
-                ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100"><CheckCircle2 className="w-3 h-3" /> Hint Given</span>
-                : <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100"><BookX className="w-3 h-3" /> Pending</span>
-              }
+        {struggles.map((e, i) => {
+          // e.title is resolved server-side now (list_struggle_events()) —
+          // handles both lesson-keyed and problem_id-keyed (DSA) events.
+          // The old lessonTitleMap/"Lesson #{id}" fallback rendered
+          // literally "Lesson #null" for any DSA event, since those never
+          // have a lesson_id at all (see StruggleEvent's exactly-one-target
+          // constraint) — kept as a last-resort fallback for an older
+          // cached response shape.
+          const lessonLabel = e.title || lessonTitleMap[e.lesson_id] || `Lesson #${e.lesson_id}`;
+          const score = e.struggle_score != null ? e.struggle_score.toFixed(2) : null;
+          const when = e.created_at ? timeAgo(e.created_at) : null;
+          return (
+            <div key={e.id ?? i} className={`grid grid-cols-12 gap-4 p-4 items-center ${i < struggles.length - 1 ? "border-b border-stone-100" : ""}`}>
+              <div className="col-span-5 font-medium text-stone-900 truncate">
+                <Link
+                  to={lessonPath(e.lesson_id, e.course_id)}
+                  className="hover:text-teal-700 transition-colors"
+                >
+                  {lessonLabel}
+                </Link>
+              </div>
+              <div className="col-span-4 text-stone-500 truncate flex flex-col gap-0.5">
+                {when && <span>{when}</span>}
+                {score && <span className="text-xs text-stone-400">Score: {score}</span>}
+              </div>
+              <div className="col-span-3 flex justify-end">
+                {e.hint_text
+                  ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100"><CheckCircle2 className="w-3 h-3" /> Hint Given</span>
+                  : <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100"><BookX className="w-3 h-3" /> No Hint Yet</span>
+                }
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   }
 
+
   return (
     <div className="page-shell font-sans">
-      {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)}>
-          <div className="fixed inset-y-0 left-0 w-72 bg-[var(--card-bg)] shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
-              <a href="/" className="inline-flex items-center gap-2">
-                <div className="w-8 h-8 rounded bg-teal-700 text-white flex items-center justify-center font-bold text-lg">A</div>
-                <span className="font-semibold text-xl tracking-tight text-[var(--text)]">A-Quire</span>
-              </a>
-              <button onClick={() => setMobileMenuOpen(false)} className="p-2 text-[var(--text-muted)] hover:bg-[var(--surface-2)] rounded-lg"><X className="w-5 h-5" /></button>
-            </div>
-            <Sidebar navItems={navItems} isMobile={true} onNavigate={() => setMobileMenuOpen(false)} />
-          </div>
-        </div>
-      )}
-      <Sidebar navItems={navItems} isMobile={false} />
+      <StudentSidebar 
+        sidebarOpen={true} 
+        activeId="/dashboard" 
+        mobileOpen={mobileMenuOpen} 
+        setMobileOpen={setMobileMenuOpen} 
+      />
       <div className="page-main">
         <Header user={user} onOpenMobileMenu={setMobileMenuOpen} unreadCount={unreadCount} />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
@@ -344,20 +343,6 @@ export default function StudentDashboard() {
               {renderStats()}
               <div className="grid lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-8">
-                  {/* AMATTA Banner */}
-                  <section className="bg-gradient-to-r from-teal-700 to-teal-900 rounded-2xl p-6 text-white shadow-md flex items-center justify-between relative overflow-hidden">
-                    <div className="relative z-10">
-                      <h3 className="text-xl font-bold mb-1 flex items-center gap-2">
-                        <Target className="w-5 h-5 text-teal-300" /> AMATTA Assessment
-                      </h3>
-                      <p className="text-teal-100 text-sm">Test your Kinematics knowledge with our new AI adaptive engine.</p>
-                    </div>
-                    <Link to="/adaptive-quiz?topic=1" className="relative z-10 px-5 py-2.5 bg-[var(--card-bg)] text-teal-800 font-bold rounded-xl shadow hover:bg-teal-50 transition-colors flex shrink-0">
-                      Start Quiz
-                    </Link>
-                    <div className="absolute right-0 top-0 opacity-10 pointer-events-none"><Sparkles className="w-48 h-48 -mr-10 -mt-10" /></div>
-                  </section>
-                  
                   <section>
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold text-stone-900">Active Courses</h3>
@@ -414,10 +399,10 @@ export default function StudentDashboard() {
                         {struggles.slice(0, 3).map((e, i) => (
                           <div key={i} className="bg-stone-700/50 border border-stone-600 p-3 rounded-lg flex justify-between items-center hover:bg-stone-700 transition-colors">
                             <div>
-                              <h4 className="font-medium text-sm">Lesson #{e.lesson_id}</h4>
+                              <h4 className="font-medium text-sm">{e.title || `Lesson #${e.lesson_id}`}</h4>
                               <p className="text-xs text-stone-400 mt-0.5">Score: {e.struggle_score?.toFixed(1) ?? "—"}</p>
                             </div>
-                            <Link to={`/lesson?id=${e.lesson_id}`} className="text-xs bg-[var(--card-bg)] text-[var(--text)] font-medium px-3 py-1.5 rounded hover:bg-teal-50 transition-colors shadow-sm">Review</Link>
+                            <Link to={lessonPath(e.lesson_id, e.course_id)} className="text-xs bg-[var(--card-bg)] text-[var(--text)] font-medium px-3 py-1.5 rounded hover:bg-teal-50 transition-colors shadow-sm">Review</Link>
                           </div>
                         ))}
                       </div>

@@ -1,47 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   PlayCircle, CheckCircle2, Lock, BrainCircuit,
   Clock, ArrowRight, BookOpen, AlertCircle,
   BarChart, Award, ChevronLeft, Lightbulb, Play,
-  Home, LineChart, Bell, Settings, User, Sun, Moon
+  Home, LineChart, Bell, Settings, User, Video, Sun, Moon, ClipboardCheck, Menu,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { LoadingState, ErrorState } from '../components/UXStates';
+import { lessonPath } from '../utils/navigation';
 
 const NAV_ITEMS = [
   { name: 'Dashboard', icon: Home, href: '/dashboard' },
   { name: 'My Courses', icon: BookOpen, href: '/courses', active: true },
-  { name: 'AI Mentor', icon: BrainCircuit, href: '/struggle-analytics' },
   { name: 'Progress', icon: LineChart, href: '/progress' },
   { name: 'Notifications', icon: Bell, href: '/notifications' },
 ];
 
-function Sidebar({ isMobile }) {
-  const navigate = useNavigate();
-  return (
-    <div className={`flex flex-col h-full sidebar-dark ${isMobile ? 'p-4' : 'w-60 p-5 hidden lg:flex'}`}>
-      {!isMobile && (
-        <a href="/" className="inline-flex items-center gap-2.5 mb-10 px-1">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-teal-700 text-white flex items-center justify-center font-bold text-base shadow-lg shadow-teal-900/40">A</div>
-          <span className="font-semibold text-lg tracking-tight text-white">A-Quire</span>
-        </a>
-      )}
-      <div className="space-y-0.5 flex-1">
-        <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest px-3 mb-2">Navigation</p>
-        {NAV_ITEMS.map(({ name, icon: Icon, href, active }) => (
-          <button key={name} onClick={() => navigate(href)} className={`sidebar-nav-item ${active ? 'active' : ''}`}>
-            <Icon className="w-4 h-4 shrink-0" /> {name}
-          </button>
-        ))}
-      </div>
-      <div className="mt-auto space-y-0.5 pt-4 border-t border-[#1E2130]">
-        <button onClick={() => navigate('/settings')} className="sidebar-nav-item"><User className="w-4 h-4 shrink-0" /> Profile</button>
-        <button onClick={() => navigate('/settings')} className="sidebar-nav-item"><Settings className="w-4 h-4 shrink-0" /> Settings</button>
-      </div>
-    </div>
-  );
-}
+import StudentSidebar from '../components/StudentSidebar';
 
 function ThemeToggle() {
   const { theme, toggle } = useTheme();
@@ -52,6 +29,28 @@ function ThemeToggle() {
   );
 }
 
+// Maps a module title or course title to the best matching topic id in the DB.
+// Topic IDs match the seed in seed_topics.py. Falls back to 1 (Kinematics) if unknown.
+function getTopicIdForModule(moduleTitle = '', courseTitle = '') {
+  const text = `${moduleTitle} ${courseTitle}`.toLowerCase();
+  if (/array|string|sliding|two.?pointer/i.test(text)) return 6;
+  if (/linked.?list|floyd|cycle/i.test(text)) return 7;
+  if (/tree|graph|bfs|dfs|binary/i.test(text)) return 8;
+  if (/sort|search|quick.?sort|binary.?search/i.test(text)) return 9;
+  if (/python|fundament/i.test(text)) return 10;
+  if (/numpy|pandas/i.test(text)) return 11;
+  if (/machine.?learn|supervised|regression|classif/i.test(text)) return 12;
+  if (/neural|deep.?learn/i.test(text)) return 13;
+  if (/intro.*cs|computer.?science/i.test(text)) return 14;
+  if (/newton|force|motion|law/i.test(text)) return 3;
+  if (/work|energy|power/i.test(text)) return 4;
+  if (/thermo|heat|entropy|calorimetry/i.test(text)) return 5;
+  if (/kinematic|velocity|accelerat|displacement/i.test(text)) return 1;
+  // Generic DSA course fallback
+  if (/dsa|data.?struct|algorithm/i.test(text)) return 6;
+  return 1; // absolute fallback
+}
+
 export default function CourseDetail() {
   const navigate = useNavigate();
   const [course, setCourse] = useState(null);
@@ -59,6 +58,7 @@ export default function CourseDetail() {
   const [progress, setProgress] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     async function loadCourse() {
@@ -75,24 +75,41 @@ export default function CourseDetail() {
         setCourse(courseData);
         setProgress(progressData);
 
-        const progressMap = {};
-        progressData.modules.forEach(m => {
-          m.lessons.forEach(l => { progressMap[l.lesson_id] = l; });
-        });
+        // getCourseProgress() only returns aggregate stats (total/completed
+        // lessons, completion_percent) — not per-lesson state. The
+        // sequential-unlock logic below needs to know which specific
+        // lessons are actually completed, so fetch each lesson's own
+        // progress in parallel. (Previously this comment described that
+        // intent but nothing actually fetched it — every lesson was
+        // hardcoded to 'locked' and never transitioned to 'completed'
+        // anywhere, so prevCompleted was false from the second lesson
+        // onward regardless of real progress: every lesson after the first
+        // stayed locked forever, even for a student who'd genuinely
+        // completed everything.)
+        const allLessons = courseData.modules.flatMap(m => m.lessons);
+        const lessonProgress = await Promise.all(
+          allLessons.map(l => api.progress.get(l.id).catch(() => null))
+        );
+        const progressByLessonId = new Map(
+          allLessons.map((l, i) => [l.id, lessonProgress[i]])
+        );
 
         const mergedModules = courseData.modules.map(m => ({
           ...m,
           lessons: m.lessons.map(l => {
-            const prog = progressMap[l.id];
-            let state = 'locked';
-            if (prog) {
-              if (prog.is_completed) state = 'completed';
-              else if (prog.watched_seconds > 0) state = 'in-progress';
-            }
-            return { ...l, state, watched_seconds: prog?.watched_seconds || 0, completion_percent: prog?.completion_percent || 0, weakTopic: false };
-          })
+            const p = progressByLessonId.get(l.id);
+            return {
+              ...l,
+              state: p?.is_completed ? 'completed' : (p?.watched_seconds > 0 ? 'in-progress' : 'locked'),
+              watched_seconds: p?.watched_seconds ?? 0,
+              completion_percent: p?.completion_percent ?? 0,
+              weakTopic: false,
+            };
+          }),
         }));
 
+        // First lesson unlocks unconditionally; each subsequent lesson
+        // unlocks once the previous one is actually completed.
         let prevCompleted = true;
         mergedModules.forEach(m => {
           m.lessons.forEach(l => {
@@ -111,59 +128,48 @@ export default function CourseDetail() {
     loadCourse();
   }, []);
 
-  const getNextLessonId = () => {
+  const getNextLesson = () => {
     for (const m of modules) {
       for (const l of m.lessons) {
-        if (l.state === 'in-progress' || l.state === 'unlocked') return l.id;
+        if (l.state === 'in-progress' || l.state === 'unlocked') return l;
       }
     }
-    return modules[0]?.lessons[0]?.id || 1;
+    return modules[0]?.lessons[0] || null;
   };
+
+  // Kept for any external callers still expecting just an id.
+  const getNextLessonId = () => getNextLesson()?.id || 1;
 
   const handleLessonClick = (lesson) => {
     if (lesson.state === 'locked') return;
-    navigate(`/lesson?id=${lesson.id}`);
+    navigate(lessonPath(lesson.id, course?.id, lesson.lesson_type));
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#F8F7F4] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-stone-500 font-medium text-sm">Loading course syllabus...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingState fullScreen message="Loading course syllabus..." />;
+  if (error || !course) return (
+    <ErrorState 
+      fullScreen 
+      title="Error Loading Course" 
+      message={error || 'The course could not be found.'} 
+      onRetry={() => navigate('/dashboard')} 
+    />
+  );
 
-  if (error || !course) {
-    return (
-      <div className="min-h-screen bg-[#F8F7F4] flex items-center justify-center p-4">
-        <div className="max-w-md premium-card p-8 rounded-2xl text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-stone-900 mb-2">Error Loading Course</h3>
-          <p className="text-stone-500 mb-6 text-sm">{error || 'The course could not be found.'}</p>
-          <a href="/dashboard" className="btn-primary">Back to Dashboard</a>
-        </div>
-      </div>
-    );
-  }
-
-  const progressPercent = progress ? Math.round(progress.average_completion) : 0;
-  const completedCount = progress ? progress.completed_lessons : 0;
-  const totalCount = progress ? progress.total_lessons : course.modules.reduce((acc, m) => acc + m.lessons.length, 0);
+  const progressPercent = progress ? Math.round(progress.completion_percent ?? progress.average_completion ?? 0) : 0;
+  const completedCount = progress ? progress.completed_lessons ?? 0 : 0;
+  const totalCount = progress ? progress.total_lessons ?? course.modules.reduce((acc, m) => acc + m.lessons.length, 0) : course.modules.reduce((acc, m) => acc + m.lessons.length, 0);
 
   return (
-    <div className="min-h-screen bg-[#F8F7F4] font-sans text-stone-900 flex">
-      {/* Sidebar */}
-      <Sidebar isMobile={false} />
+    <div className="page-shell font-sans text-stone-900">
+      <StudentSidebar sidebarOpen={true} activeId="/courses" mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
 
       {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="page-main">
 
         {/* Sticky Header */}
         <nav className="app-header sticky top-0 z-40 px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
+            <button className="lg:hidden p-2 -ml-2 rounded-lg" style={{ color: 'var(--text-muted)' }} onClick={() => setMobileOpen(true)}><Menu className="w-5 h-5" /></button>
             <button
               onClick={() => navigate('/dashboard')}
               className="flex items-center gap-1.5 font-medium group text-sm transition-colors"
@@ -176,7 +182,7 @@ export default function CourseDetail() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <a href={`/lesson?id=${getNextLessonId()}`} className="btn-primary text-xs px-4 py-2">
+            <a href={lessonPath(getNextLesson()?.id, course?.id, getNextLesson()?.lesson_type)} className="btn-primary text-xs px-4 py-2">
               <Play className="w-3.5 h-3.5 fill-current" /> Resume
             </a>
           </div>
@@ -192,7 +198,7 @@ export default function CourseDetail() {
           <div className="max-w-6xl mx-auto flex flex-col lg:flex-row justify-between items-start gap-8 relative z-10">
             <div className="max-w-2xl">
               <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-teal-500/20 border border-teal-500/30 text-teal-300 text-[11px] font-bold uppercase tracking-wider mb-4">
-                {course.title.includes('Data Structures') ? 'Computer Science' : 'Physics Department'}
+                {course.exam_category ? `${course.exam_category} Department` : 'General Department'}
               </div>
               <h1 className="text-3xl sm:text-4xl font-bold mb-3 text-white leading-tight">{course.title}</h1>
               <p className="text-slate-400 text-base leading-relaxed mb-5">{course.description}</p>
@@ -201,7 +207,7 @@ export default function CourseDetail() {
                   <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-slate-300">
                     <UserIcon className="w-3.5 h-3.5" />
                   </div>
-                  Dr. Alan Davis
+                  {course.instructor_name || 'Instructor'}
                 </span>
                 <span className="flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5" /> {totalCount} Lessons</span>
               </div>
@@ -223,7 +229,7 @@ export default function CourseDetail() {
                 <p className="text-xs text-slate-500 mt-2">{completedCount} of {totalCount} lessons completed</p>
               </div>
               <a
-                href={`/lesson?id=${getNextLessonId()}`}
+                href={lessonPath(getNextLesson()?.id, course?.id, getNextLesson()?.lesson_type)}
                 className="w-full bg-teal-500 hover:bg-teal-400 text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-teal-900/40 flex items-center justify-center gap-2 text-sm"
               >
                 <Play className="w-4 h-4 fill-current" /> Resume Learning
@@ -247,7 +253,16 @@ export default function CourseDetail() {
                 <div key={mod.id} className="premium-card rounded-2xl overflow-hidden animate-fade-in-up" style={{ animationDelay: `${mIdx * 60}ms` }}>
                   <div className="px-5 py-4 border-b border-stone-100 flex items-center justify-between bg-stone-50/60">
                     <h3 className="font-semibold text-stone-900 text-sm">{mod.title}</h3>
-                    <span className="text-xs font-medium text-stone-400 bg-stone-100 px-2.5 py-1 rounded-full">{mod.lessons.length} lessons</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-stone-400 bg-stone-100 px-2.5 py-1 rounded-full">{mod.lessons.length} lessons</span>
+                      <Link
+                        to={`/adaptive-quiz?module=${mod.id}&course=${course.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-1.5 text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-full hover:bg-teal-100 transition-colors"
+                      >
+                        <BrainCircuit className="w-3 h-3" /> Chapter Quiz
+                      </Link>
+                    </div>
                   </div>
 
                   <div className="divide-y divide-stone-50">
@@ -309,9 +324,16 @@ export default function CourseDetail() {
                           </div>
 
                           {/* CTA */}
-                          <div className="shrink-0 flex items-center justify-end sm:w-28">
+                          <div className="shrink-0 flex items-center justify-end gap-2 sm:w-44">
+                            <Link
+                              to={`/adaptive-quiz?topic=${getTopicIdForModule(mod.title, course?.title)}&course=${course.id}&lesson=${lesson.id}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-[10px] font-bold uppercase tracking-wider text-teal-700 bg-teal-50 border border-teal-200 px-2 py-1 rounded hover:bg-teal-100 transition-colors flex items-center gap-1"
+                            >
+                              <BrainCircuit className="w-3 h-3" /> Quiz
+                            </Link>
                             {isInProgress && (
-                              <button className="text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-200 px-3.5 py-1.5 rounded-lg hover:bg-teal-100 transition-colors flex items-center gap-1.5">
+                              <button className="text-xs font-semibold text-stone-700 bg-white border border-stone-200 px-3.5 py-1.5 rounded-lg hover:bg-stone-50 transition-colors flex items-center gap-1.5">
                                 Resume <ArrowRight className="w-3 h-3" />
                               </button>
                             )}
@@ -363,7 +385,7 @@ export default function CourseDetail() {
                 <div className="space-y-4">
                   {[
                     { icon: CheckCircle2, iconClass: 'bg-emerald-50 text-emerald-600', label: `${completedCount} of ${totalCount} Lessons`, sub: 'Completed successfully' },
-                    { icon: BarChart, iconClass: 'bg-teal-50 text-teal-700', label: course.title.includes('Data Structures') ? 'DSA Core Syllabus' : 'Thermodynamics Core', sub: 'Registered enrollment' },
+                    { icon: BarChart, iconClass: 'bg-teal-50 text-teal-700', label: course.exam_category ? `${course.exam_category} Core Syllabus` : 'Core Syllabus', sub: 'Registered enrollment' },
                     { icon: Award, iconClass: 'bg-amber-50 text-amber-600', label: 'Certificate of Completion', sub: 'Earned at 100% progress' },
                   ].map(({ icon: Icon, iconClass, label, sub }, i) => (
                     <div key={i} className="flex items-center gap-3">

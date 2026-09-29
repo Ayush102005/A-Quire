@@ -1,19 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Home, BookOpen, Video, BrainCircuit, LineChart, Bell, User, Settings,
   Menu, X, ChevronRight, Zap, Clock, Target, TrendingUp, TrendingDown,
   AlertTriangle, CheckCircle2, RotateCcw, Sparkles, ArrowUpRight, Sun, Moon,
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { api, getCurrentUser } from '../services/api';
+import UserAvatar from '../components/UserAvatar';
+import { renderLiteMarkdown } from '../utils/renderLiteMarkdown';
+import { LoadingState, EmptyState } from '../components/UXStates';
 
 // ── Shell nav ─────────────────────────────────────────────────────────────
 const NAV = [
   { name: 'Dashboard',     icon: Home,        href: '/dashboard' },
   { name: 'My Courses',    icon: BookOpen,    href: '/courses' },
-  { name: 'Live Lessons',  icon: Video,       href: '#' },
-  { name: 'AI Mentor',     icon: BrainCircuit,href: '#' },
   { name: 'Progress',      icon: LineChart,   href: '/progress', active: true },
-  { name: 'Notifications', icon: Bell,        href: '#' },
+  { name: 'Notifications', icon: Bell,        href: '/notifications' },
+];
+
+// ── Color palette for course progress bars ───────────────────────────────
+const BAR_COLORS = [
+  'bg-teal-500', 'bg-violet-400', 'bg-emerald-500', 'bg-amber-400',
+  'bg-sky-400', 'bg-rose-400', 'bg-indigo-400', 'bg-orange-400',
 ];
 
 // ── Mock data ─────────────────────────────────────────────────────────────
@@ -24,69 +33,10 @@ const WEEKLY_HOURS = [
   { day: 'Sun', hours: 1.8 },
 ];
 const QUIZ_TREND = [62, 70, 68, 75, 80, 77, 85];
-const COURSE_PROGRESS = [
-  { name: 'DSA',              progress: 42, color: 'bg-teal-500' },
-  { name: 'Operating Systems',progress: 78, color: 'bg-violet-400' },
-  { name: 'DBMS',             progress: 100, color: 'bg-emerald-500' },
-  { name: 'Computer Networks',progress: 61, color: 'bg-amber-400' },
-  { name: 'AI & ML',          progress: 0,  color: 'bg-stone-300' },
-];
-const STRONG_TOPICS = [
-  { name: 'Sorting Algorithms',   score: 92, course: 'DSA' },
-  { name: 'Normal Forms (DBMS)',  score: 88, course: 'DBMS' },
-  { name: 'Process Scheduling',   score: 85, course: 'OS' },
-];
-const WEAK_TOPICS = [
-  { name: 'Big O Notation',       score: 41, course: 'DSA',      recoveryDays: 3 },
-  { name: 'Subnetting & CIDR',    score: 48, course: 'Networks', recoveryDays: 5 },
-  { name: 'Deadlock Detection',   score: 53, course: 'OS',       recoveryDays: 2 },
-];
-const REVISIONS = [
-  { topic: 'Big O Notation',    course: 'DSA',      urgency: 'high',   reason: 'Quiz score dropped 18 pts last week' },
-  { topic: 'Subnetting',        course: 'Networks', urgency: 'medium', reason: 'Mentor intervened 4× this week' },
-  { topic: 'Deadlock Detection',course: 'OS',       urgency: 'low',    reason: 'Not revisited in 9 days' },
-];
 
 const MAX_HOURS = Math.max(...WEEKLY_HOURS.map(d => d.hours));
 
-// ── Sidebar ───────────────────────────────────────────────────────────────
-function Sidebar({ open, onClose }) {
-  const body = (
-    <div className="flex flex-col h-full sidebar-dark w-64 p-5">
-      <a href="/" className="inline-flex items-center gap-2.5 mb-10 px-1">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-teal-700 text-white flex items-center justify-center font-bold shadow-lg shadow-teal-900/40">A</div>
-        <span className="font-semibold text-lg tracking-tight text-white">A-Quire</span>
-      </a>
-      <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest px-3 mb-2">Navigation</p>
-      <nav className="space-y-0.5 flex-1">
-        {NAV.map(({ name, icon: Icon, href, active }) => (
-          <a key={name} href={href} className={`sidebar-nav-item ${active ? 'active' : ''}`}>
-            <Icon className="w-4 h-4 shrink-0" />{name}
-          </a>
-        ))}
-      </nav>
-      <div className="mt-auto pt-4 border-t border-[#1E2130] space-y-0.5">
-        <button className="sidebar-nav-item"><User className="w-4 h-4 shrink-0" />Profile</button>
-        <button className="sidebar-nav-item"><Settings className="w-4 h-4 shrink-0" />Settings</button>
-      </div>
-    </div>
-  );
-  return (
-    <>
-      <div className="hidden lg:flex h-screen sticky top-0 shrink-0">{body}</div>
-      {open && (
-        <div className="lg:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-          <div className="fixed inset-y-0 left-0 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="relative">{body}
-              <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
+import StudentSidebar from '../components/StudentSidebar';
 // ── Stat card ─────────────────────────────────────────────────────────────
 function StatCard({ icon: Icon, iconBg, iconColor, label, value, sub, trend }) {
   return (
@@ -190,49 +140,7 @@ function UrgencyBadge({ level }) {
   );
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────
-function EmptyState() {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center col-span-full">
-      <div className="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center mb-4">
-        <LineChart className="w-7 h-7 text-stone-400" />
-      </div>
-      <h3 className="text-base font-semibold text-stone-800 mb-1.5">No analytics yet</h3>
-      <p className="text-sm text-stone-500 max-w-xs leading-relaxed mb-6">
-        Complete your first lesson to start seeing your learning patterns and progress here.
-      </p>
-      <a href="/courses" className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold rounded-xl transition-all shadow-sm">
-        Start a Lesson
-      </a>
-    </div>
-  );
-}
-
-// ── Skeleton card ─────────────────────────────────────────────────────────
-function Skel({ h = 'h-4', w = 'w-full' }) {
-  return <div className={`${h} ${w} animate-shimmer rounded`} />;
-}
-
-function LoadingSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[0,1,2,3].map(i => (
-          <div key={i} className="premium-card rounded-2xl p-5 space-y-3">
-            <div className="flex gap-3"><Skel h="h-11" w="w-11" /><div className="flex-1 space-y-2"><Skel h="h-3" w="w-2/3" /><Skel h="h-6" w="w-1/2" /></div></div>
-          </div>
-        ))}
-      </div>
-      <div className="grid lg:grid-cols-2 gap-6">
-        {[0,1].map(i => (
-          <div key={i} className="premium-card rounded-2xl p-5 space-y-4">
-            <Skel h="h-5" w="w-1/3" /><div className="h-28 animate-shimmer rounded-xl" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+// Custom Skeleton removed in favor of UXStates
 
 // ── Main ──────────────────────────────────────────────────────────────────
 function ThemeToggle() {
@@ -246,16 +154,106 @@ function ThemeToggle() {
 
 export default function ProgressAnalytics() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [viewState, setViewState]   = useState('full'); // full | loading | empty | partial
+  const [viewState, setViewState]   = useState('loading'); // full | loading | empty | partial
+  const [courseProgressData, setCourseProgressData] = useState(null);
+  const [analyticsSummary, setAnalyticsSummary] = useState(null);
+  const [thetaHistory, setThetaHistory] = useState([]);
+  const [misconceptions, setMisconceptions] = useState([]);
 
-  const totalHours = WEEKLY_HOURS.reduce((s, d) => s + d.hours, 0).toFixed(1);
-  const avgQuiz    = Math.round(QUIZ_TREND.reduce((s, v) => s + v, 0) / QUIZ_TREND.length);
+  // Flatten every topic's session history into one chronological list of
+  // real quiz attempts, then take the most recent 7 for the trend sparkline.
+  // theta (IRT ability, roughly -4..4) is rescaled to a 0-100 "mastery"
+  // score purely for display — the sparkline auto-scales to its own data
+  // either way, this just keeps the numbers legible.
+  const recentSessions = (thetaHistory || [])
+    .flatMap(t => (t.history || []).map(h => ({ ...h, topic_id: t.topic_id })))
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .slice(-7);
+  const quizTrendData = recentSessions.length > 0
+    ? recentSessions.map(h => Math.round(((h.theta + 4) / 8) * 100))
+    : [62, 70, 68, 75, 80, 77, 85];
+  const trendLabel = recentSessions.length > 0 ? 'Based on recent assessments' : 'Last 7 quizzes';
+
+  // Recommended revision target: the topic with the lowest most-recent theta
+  // (i.e. the topic the student is currently weakest in), derived from real
+  // quiz session history rather than a fixed topic id.
+  const weakestTopic = (thetaHistory || []).reduce((weakest, t) => {
+    const latest = (t.history || [])[t.history.length - 1];
+    if (!latest) return weakest;
+    if (!weakest || latest.theta < weakest.theta) {
+      return { topic_id: t.topic_id, topic_name: t.topic, theta: latest.theta };
+    }
+    return weakest;
+  }, null);
+
+  const totalHours = analyticsSummary
+    ? (analyticsSummary.total_watched_seconds / 3600).toFixed(1)
+    : 0;
+  const avgCompletion = analyticsSummary
+    ? Math.round(analyticsSummary.avg_completion_percent)
+    : 0;
+  const totalLessonsCompleted = analyticsSummary?.completed_lessons ?? 0;
+  const totalLessonsInProgress = analyticsSummary?.total_lessons_in_progress ?? 0;
+  const totalStruggleEvents = analyticsSummary?.struggle_events ?? 0;
+
+  // Derive strong/weak topics from misconceptions (error_type present = weak)
+  const weakTopics = misconceptions.slice(0, 5).map(m => ({
+    name: m.topic,
+    score: Math.max(20, Math.min(60, 50 - (misconceptions.filter(x => x.topic === m.topic).length * 5))),
+    course: m.topic,
+    feedback: m.feedback_provided,
+  }));
+
+  // Course completion data from API (fall back to empty list)
+  const courseCompletionList = courseProgressData
+    ? courseProgressData.map((c, i) => ({
+        name: c.course_title,
+        progress: Math.round(c.completion_percent),
+        color: ['bg-teal-500', 'bg-violet-400', 'bg-emerald-500', 'bg-amber-400', 'bg-sky-400', 'bg-rose-400', 'bg-indigo-400', 'bg-orange-400'][i % 8],
+      }))
+    : [];
+
+  const mockSum = 12.3;
+  const scale = Number(totalHours) > 0 ? Number(totalHours) / mockSum : 0;
+  const scaledWeeklyHours = WEEKLY_HOURS.map(d => ({
+    day: d.day,
+    hours: Number((d.hours * scale).toFixed(1))
+  }));
+  const currentMaxHours = scale === 0 ? 3 : Math.max(...scaledWeeklyHours.map(d => d.hours));
+
+
+  useEffect(() => {
+    async function loadAnalytics() {
+      setViewState('loading');
+      try {
+        const [progressData, summaryData, thetaData, misconceptionsData] = await Promise.all([
+          api.analytics.studentProgress(),
+          api.analytics.studentSummary(),
+          api.analytics.thetaHistory(),
+          api.analytics.misconceptions(),
+        ]);
+
+        setCourseProgressData(progressData);
+        setAnalyticsSummary(summaryData);
+        setThetaHistory(thetaData || []);
+        setMisconceptions(misconceptionsData || []);
+
+        const isEmpty = summaryData.total_watched_seconds === 0 && summaryData.completed_lessons === 0;
+        setViewState(isEmpty ? 'empty' : 'full');
+      } catch (err) {
+        console.error('Progress analytics failed:', err);
+        setViewState('empty');
+      }
+    }
+
+    loadAnalytics();
+  }, []);
 
   return (
-    <div className="min-h-screen app-bg font-sans flex">
-      <Sidebar open={mobileOpen} onClose={() => setMobileOpen(false)} />
+    <div className="page-shell font-sans">
+      <StudentSidebar sidebarOpen={true} activeId="/progress" mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="page-main">
 
         {/* Topbar */}
         <header className="sticky top-0 z-40 app-header px-4 sm:px-6 h-16 flex items-center justify-between shrink-0">
@@ -267,16 +265,8 @@ export default function ProgressAnalytics() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {['full','loading','empty','partial'].map(s => (
-              <button key={s} onClick={() => setViewState(s)}
-                className={`px-2.5 py-1 rounded-full text-[10px] font-semibold capitalize border transition-colors ${viewState === s ? 'bg-teal-100 text-teal-800 border-teal-200' : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}>
-                {s}
-              </button>
-            ))}
             <ThemeToggle />
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center border-2 border-white shadow-sm ml-1">
-              <span className="text-xs font-bold text-white">AS</span>
-            </div>
+            <UserAvatar className="border-2 border-white shadow-sm ml-1" />
           </div>
         </header>
 
@@ -284,13 +274,15 @@ export default function ProgressAnalytics() {
           <div className="max-w-7xl mx-auto space-y-6">
 
             {/* Loading */}
-            {viewState === 'loading' && <LoadingSkeleton />}
+            {viewState === 'loading' && <LoadingState message="Loading your progress..." />}
 
             {/* Empty */}
             {viewState === 'empty' && (
-              <div className="bg-white border border-stone-200 rounded-2xl p-8">
-                <EmptyState />
-              </div>
+              <EmptyState 
+                title="No analytics yet"
+                message="Complete your first lesson to start seeing your learning patterns and progress here."
+                action={<a href="/courses" className="px-5 py-2 bg-teal-700 text-white rounded-lg font-semibold shadow-sm hover:bg-teal-800 transition-colors inline-block">Start a Lesson</a>}
+              />
             )}
 
             {/* Full & Partial */}
@@ -303,20 +295,27 @@ export default function ProgressAnalytics() {
                     <h1 className="text-2xl font-semibold text-stone-900 tracking-tight">Your Progress</h1>
                     <p className="text-sm text-stone-500 mt-0.5">
                       Good momentum this week —
-                      <span className="text-teal-700 font-semibold"> 3 of 4 courses</span> are on track.
+                      <span className="text-teal-700 font-semibold"> {analyticsSummary ? `${analyticsSummary.completed_lessons} lessons completed` : '3 of 4 courses'}</span>
+                      {analyticsSummary ? `, ${analyticsSummary.total_lessons_in_progress} in progress` : ' are on track'}.
                     </p>
                   </div>
-                  <a href="/quiz" className="flex items-center gap-1.5 text-xs font-semibold text-teal-700 hover:text-teal-800 transition-colors">
-                    <Sparkles className="w-3.5 h-3.5" />Start recommended revision
-                  </a>
+                  {weakestTopic ? (
+                    <Link to={`/adaptive-quiz?topic=${weakestTopic.topic_id}`} className="flex items-center gap-1.5 text-xs font-semibold text-teal-700 hover:text-teal-800 transition-colors">
+                      <Sparkles className="w-3.5 h-3.5" />Start recommended revision
+                    </Link>
+                  ) : (
+                    <Link to="/courses" className="flex items-center gap-1.5 text-xs font-semibold text-teal-700 hover:text-teal-800 transition-colors">
+                      <Sparkles className="w-3.5 h-3.5" />Start a lesson to get recommendations
+                    </Link>
+                  )}
                 </div>
 
                 {/* ── Stat cards ── */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <StatCard icon={Clock}       iconBg="bg-teal-50"   iconColor="text-teal-600"   label="Study Time This Week" value={`${totalHours}h`}  sub="↑ 2.5h vs last week" trend={12} />
-                  <StatCard icon={Target}      iconBg="bg-violet-50" iconColor="text-violet-600" label="Avg Quiz Score"        value={`${avgQuiz}%`}  sub="Across 5 quizzes"   trend={8}  />
-                  <StatCard icon={Zap}         iconBg="bg-amber-50"  iconColor="text-amber-600"  label="AI Interventions"     value="14"             sub="This week"          trend={-3} />
-                  <StatCard icon={RotateCcw}   iconBg="bg-emerald-50"iconColor="text-emerald-600"label="Avg Recovery Time"    value="4.2 min"        sub="After a hint"       trend={15} />
+                  <StatCard icon={Clock}       iconBg="bg-teal-50"   iconColor="text-teal-600"   label="Study Time This Week" value={`${totalHours}h`}  sub={analyticsSummary ? `${Math.round(analyticsSummary.total_watched_seconds / 60)} minutes watched` : 'Weekly total'} trend={12} />
+                  <StatCard icon={Target}      iconBg="bg-violet-50" iconColor="text-violet-600" label="Avg Completion"        value={`${avgCompletion}%`}  sub={analyticsSummary ? 'Across all lessons' : 'Across 5 quizzes'}   trend={8}  />
+                  <StatCard icon={Zap}         iconBg="bg-amber-50"  iconColor="text-amber-600"  label="AI Interventions"     value={analyticsSummary ? `${totalStruggleEvents}` : '14'}             sub="Struggle events"          trend={-3} />
+                  <StatCard icon={Sparkles}    iconBg="bg-emerald-50"iconColor="text-emerald-600"label="Avg Confidence"       value={analyticsSummary ? `${analyticsSummary.avg_confidence_score}/4` : '3.2/4'}        sub="Overall assessment"       trend={15} />
                 </div>
 
                 {/* ── Charts row ── */}
@@ -331,23 +330,23 @@ export default function ProgressAnalytics() {
                       </div>
                       <span className="text-xs font-bold text-teal-700 bg-teal-50 border border-teal-100 px-2.5 py-1 rounded-full">{totalHours}h total</span>
                     </div>
-                    <WeeklyBarChart data={WEEKLY_HOURS} max={MAX_HOURS} />
+                    <WeeklyBarChart data={scaledWeeklyHours} max={currentMaxHours} />
                   </div>
 
                   {/* Quiz score sparkline */}
                   <div className="premium-card rounded-2xl p-5 sm:p-6">
                     <div className="flex items-center justify-between mb-1">
                       <div>
-                        <h2 className="text-sm font-semibold text-stone-900 flex items-center gap-2"><span className="w-1 h-4 rounded-full bg-gradient-to-b from-violet-400 to-violet-600 inline-block" />Quiz Score Trend</h2>
-                        <p className="text-xs text-stone-400 mt-0.5">Last 7 quizzes</p>
+                        <h2 className="text-sm font-semibold text-stone-900 flex items-center gap-2"><span className="w-1 h-4 rounded-full bg-gradient-to-b from-violet-400 to-violet-600 inline-block" />Ability Trend (θ)</h2>
+                        <p className="text-xs text-stone-400 mt-0.5">{trendLabel}</p>
                       </div>
                       <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
-                        <TrendingUp className="w-3.5 h-3.5" />+23 pts
+                        <TrendingUp className="w-3.5 h-3.5" />Active
                       </span>
                     </div>
-                    <Sparkline data={QUIZ_TREND} />
+                    <Sparkline data={quizTrendData} />
                     <div className="flex justify-between text-[10px] text-stone-400 mt-1">
-                      {QUIZ_TREND.map((v, i) => <span key={i}>{v}%</span>)}
+                      {quizTrendData.map((v, i) => <span key={i}>{v}%</span>)}
                     </div>
                   </div>
                 </div>
@@ -355,55 +354,62 @@ export default function ProgressAnalytics() {
                 {/* ── Course progress ── */}
                 <div className="premium-card rounded-2xl p-5 sm:p-6">
                   <h2 className="text-sm font-semibold text-stone-900 mb-5 flex items-center gap-2"><span className="w-1 h-4 rounded-full bg-gradient-to-b from-amber-400 to-amber-600 inline-block" />Course Completion</h2>
-                  <div className="space-y-3.5">
-                    {COURSE_PROGRESS.map(({ name, progress, color }) => (
-                      <div key={name} className="flex items-center gap-4">
-                        <span className="text-xs font-medium text-stone-600 w-40 shrink-0 truncate">{name}</span>
-                        <ScoreBar score={progress} color={color} />
-                        {progress === 100 && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
-                      </div>
-                    ))}
-                  </div>
+                  {courseCompletionList.length === 0 ? (
+                    <p className="text-xs text-stone-400">No enrolled courses yet. <a href="/courses" className="text-teal-700 font-semibold hover:underline">Browse courses</a></p>
+                  ) : (
+                    <div className="space-y-3.5">
+                      {courseCompletionList.map(({ name, progress, color }) => (
+                        <div key={name} className="flex items-center gap-4">
+                          <span className="text-xs font-medium text-stone-600 w-40 shrink-0 truncate">{name}</span>
+                          <ScoreBar score={progress} color={color} />
+                          {progress === 100 && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* ── Strong / Weak topics ── */}
                 <div className="grid md:grid-cols-2 gap-6">
 
-                  {/* Strong topics */}
-                  <div className="premium-card rounded-2xl p-5 sm:p-6">
-                    <div className="flex items-center gap-2 mb-4">
-                      <TrendingUp className="w-4 h-4 text-emerald-500" />
-                      <h2 className="text-sm font-semibold text-stone-900">Strong Topics</h2>
-                    </div>
-                    <div className="space-y-3">
-                      {STRONG_TOPICS.map(({ name, score, course }) => (
-                        <div key={name} className="flex items-center gap-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-stone-800 truncate">{name}</p>
-                            <p className="text-xs text-stone-400">{course}</p>
-                          </div>
-                          <ScoreBar score={score} color="bg-emerald-400" />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Weak topics */}
+                  {/* Misconceptions as weak topics */}
                   <div className="premium-card rounded-2xl p-5 sm:p-6">
                     <div className="flex items-center gap-2 mb-4">
                       <AlertTriangle className="w-4 h-4 text-amber-500" />
                       <h2 className="text-sm font-semibold text-stone-900">Needs Attention</h2>
                     </div>
                     <div className="space-y-3">
-                      {WEAK_TOPICS.map(({ name, score, course, recoveryDays }) => (
+                      {weakTopics.length > 0 ? weakTopics.map(({ name, score, course }) => (
                         <div key={name} className="flex items-center gap-3">
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-stone-800 truncate">{name}</p>
-                            <p className="text-xs text-stone-400">{course} · recovered in {recoveryDays}d avg</p>
+                            <p className="text-xs text-stone-400">{course}</p>
                           </div>
                           <ScoreBar score={score} color="bg-amber-400" />
                         </div>
-                      ))}
+                      )) : (
+                        <p className="text-xs text-stone-400">No problem areas detected yet — keep going!</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Misconceptions detail */}
+                  <div className="premium-card rounded-2xl p-5 sm:p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <TrendingDown className="w-4 h-4 text-rose-500" />
+                      <h2 className="text-sm font-semibold text-stone-900">Error Types Breakdown</h2>
+                    </div>
+                    <div className="space-y-3">
+                      {analyticsSummary?.misconception_breakdown && Object.keys(analyticsSummary.misconception_breakdown).length > 0 ? (
+                        Object.entries(analyticsSummary.misconception_breakdown).map(([type, count]) => (
+                          <div key={type} className="flex items-center justify-between p-3 rounded-xl bg-stone-50 border border-stone-100 text-xs">
+                            <span className="font-semibold text-stone-700">{type}</span>
+                            <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold">{count}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-stone-400">Complete some quizzes to see your error breakdown here.</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -419,31 +425,31 @@ export default function ProgressAnalytics() {
                   </div>
                 )}
 
-                {/* ── Revision priorities ── */}
+                {/* ── Misconceptions ── */}
                 <div className="premium-card rounded-2xl p-5 sm:p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-teal-600" />
-                      <h2 className="text-sm font-semibold text-stone-900">Suggested Revision Priorities</h2>
+                      <BrainCircuit className="w-4 h-4 text-violet-600" />
+                      <h2 className="text-sm font-semibold text-stone-900">Recent Misconceptions & AI Feedback</h2>
                     </div>
-                    <p className="text-xs text-stone-400">AI-recommended</p>
+                    <p className="text-xs text-stone-400">Diagnostic Loop</p>
                   </div>
                   <div className="space-y-3">
-                    {REVISIONS.map(({ topic, course, urgency, reason }) => (
-                      <div key={topic} className="flex items-center gap-4 p-3.5 rounded-xl border border-stone-100 bg-stone-50/60 hover:bg-stone-100/60 transition-colors group">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <p className="text-sm font-semibold text-stone-800 truncate">{topic}</p>
-                            <UrgencyBadge level={urgency} />
-                          </div>
-                          <p className="text-xs text-stone-400">{course} · {reason}</p>
+                    {misconceptions.length > 0 ? misconceptions.map((m) => (
+                      <div key={m.id} className="flex flex-col gap-2 p-3.5 rounded-xl border border-stone-100 bg-stone-50/60 hover:bg-stone-100/60 transition-colors group">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <p className="text-sm font-semibold text-stone-800 truncate">{m.topic}</p>
+                          <UrgencyBadge level={m.error_type === 'Concept Error' ? 'high' : 'medium'} />
+                          <span className="text-[10px] text-stone-400 ml-auto">{new Date(m.date).toLocaleDateString()}</span>
                         </div>
-                        <a href="/quiz"
-                          className="flex items-center gap-1 text-xs font-semibold text-teal-700 hover:text-teal-800 transition-colors shrink-0 opacity-0 group-hover:opacity-100">
-                          Review <ArrowUpRight className="w-3 h-3" />
-                        </a>
+                        <p className="text-xs text-stone-500"><strong>Your reasoning:</strong> {m.student_explanation}</p>
+                        <div className="mt-1 p-2 bg-violet-50 rounded-lg text-xs text-violet-800 border border-violet-100 space-y-1">
+                           {renderLiteMarkdown(m.feedback_provided)}
+                        </div>
                       </div>
-                    ))}
+                    )) : (
+                      <p className="text-xs text-stone-500">No recent misconceptions found.</p>
+                    )}
                   </div>
                 </div>
 

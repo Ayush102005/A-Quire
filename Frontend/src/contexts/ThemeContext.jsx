@@ -1,16 +1,16 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 
-const ThemeContext = createContext({ theme: 'light', toggle: () => {} });
+const ThemeContext = createContext({ theme: 'dark', toggle: () => {} });
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => {
     try {
       const stored = localStorage.getItem('aq-theme');
       if (stored === 'dark' || stored === 'light') return stored;
-      // Honour OS preference on first visit
-      if (window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+      // Honour OS preference; default to dark if no preference set
+      if (window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
     } catch {}
-    return 'light';
+    return 'dark'; // A-Quire is a dark-first product
   });
 
   useEffect(() => {

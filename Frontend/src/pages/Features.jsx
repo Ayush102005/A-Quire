@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { 
   Menu, X, ShieldCheck, CheckCircle2,
   BookOpen, BrainCircuit, Mic, RotateCcw, 
@@ -9,10 +9,10 @@ export default function Features() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-stone-50 text-stone-900 font-sans">
+    <div className="min-h-screen app-bg font-sans">
       
       {/* 1. Top Navigation */}
-      <nav className="sticky top-0 z-50 bg-stone-50/90 backdrop-blur-md border-b border-stone-200">
+      <nav className="sticky top-0 z-50 app-header backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <a href="/" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded bg-teal-700 text-white flex items-center justify-center font-bold text-lg">A</div>

@@ -4,7 +4,7 @@ import { Home, ArrowLeft } from 'lucide-react';
 export default function NotFound() {
   const navigate = useNavigate();
   return (
-    <div className="min-h-screen bg-[#F8F7F4] flex items-center justify-center p-6 font-sans">
+    <div className="min-h-screen flex items-center justify-center p-6 font-sans" style={{backgroundColor:'var(--bg)'}}>
       <div className="text-center max-w-md">
         {/* Big 404 */}
         <p className="text-[120px] font-black leading-none bg-gradient-to-br from-teal-500 to-teal-700 bg-clip-text text-transparent select-none">

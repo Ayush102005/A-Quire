@@ -1,27 +1,21 @@
+"""
+app/api/v1/health.py
+─────────────────────
+Public health-check router — no authentication required.
+Mounted at GET /api/v1/health by the v1 API router.
+"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter
 
-from app.core.database import get_db
-
-router = APIRouter()
+router = APIRouter(tags=["Health"])
 
 
-@router.get("/health", tags=["health"])
-async def health_check(db: AsyncSession = Depends(get_db)) -> dict:
+@router.get("/health", summary="Health check")
+async def health_check() -> dict:
     """
-    Liveness + readiness probe.
-    Returns 200 if the API is up and the database is reachable.
+    Returns HTTP 200 with status 'ok'.
+    Used by load-balancers, uptime monitors, and deployment pipelines
+    to confirm the service is reachable.
     """
-    db_status = "ok"
-    try:
-        await db.execute(text("SELECT 1"))
-    except Exception as exc:
-        db_status = f"error: {exc}"
-
-    return {
-        "status": "ok" if db_status == "ok" else "degraded",
-        "database": db_status,
-    }
+    return {"status": "ok"}

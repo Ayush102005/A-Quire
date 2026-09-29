@@ -609,3 +609,151 @@
     border-radius: 6px;
   }
 }
+
+/* ============================================================
+   DARK MODE — GLOBAL PAGE CONSISTENCY OVERRIDES
+   Forces every page to honour the dark palette even when
+   Tailwind utility classes are hardcoded (bg-white, bg-stone-*,
+   text-stone-*, border-stone-*, etc.).
+   Applies only when .dark is on <html>.
+   ============================================================ */
+
+/* ── Ensure html, body and all full-height roots are always dark ── */
+html, body {
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+/* ── Background overrides ─────────────────────────────────────────── */
+.dark .bg-white,
+.dark .bg-gray-50,
+.dark .bg-gray-100,
+.dark .bg-stone-50,
+.dark .bg-stone-100,
+.dark .bg-slate-50,
+.dark .bg-slate-100 {
+  background-color: var(--surface) !important;
+}
+
+.dark .bg-gray-200,
+.dark .bg-stone-200,
+.dark .bg-slate-200 {
+  background-color: var(--surface-2) !important;
+}
+
+/* Preserve intentional transparent/overlay whites (bg-white/X) */
+/* Tailwind generates these as separate classes so they are unaffected */
+
+/* ── Text colour overrides ────────────────────────────────────────── */
+.dark .text-black,
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700,
+.dark .text-stone-900,
+.dark .text-stone-800,
+.dark .text-stone-700,
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700 {
+  color: var(--text) !important;
+}
+
+.dark .text-gray-600,
+.dark .text-gray-500,
+.dark .text-stone-600,
+.dark .text-stone-500,
+.dark .text-slate-600,
+.dark .text-slate-500 {
+  color: var(--text-muted) !important;
+}
+
+.dark .text-gray-400,
+.dark .text-stone-400,
+.dark .text-slate-400 {
+  color: var(--text-faint) !important;
+}
+
+/* ── Border colour overrides ──────────────────────────────────────── */
+.dark .border-white,
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-stone-100,
+.dark .border-stone-200,
+.dark .border-slate-100,
+.dark .border-slate-200 {
+  border-color: var(--border) !important;
+}
+
+.dark .border-gray-300,
+.dark .border-stone-300,
+.dark .border-slate-300 {
+  border-color: var(--border-2) !important;
+}
+
+/* ── Divide colour overrides ──────────────────────────────────────── */
+.dark .divide-stone-200 > * + *,
+.dark .divide-gray-200 > * + *,
+.dark .divide-slate-200 > * + * {
+  border-color: var(--border) !important;
+}
+
+/* ── Input & form control backgrounds ────────────────────────────── */
+.dark input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+.dark textarea,
+.dark select {
+  background-color: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--input-text);
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--text-faint);
+}
+
+/* ── Nav / header backgrounds that use light colours ─────────────── */
+.dark nav.bg-white,
+.dark nav.bg-stone-50,
+.dark header.bg-white,
+.dark header.bg-stone-50 {
+  background-color: var(--header-bg) !important;
+  border-color: var(--header-border) !important;
+}
+
+/* ── Sections / full-page backgrounds ────────────────────────────── */
+.dark section.bg-white,
+.dark section.bg-stone-50,
+.dark section.bg-gray-50 {
+  background-color: var(--bg) !important;
+}
+
+/* ── Shadow adjustments for dark ─────────────────────────────────── */
+.dark .shadow-sm  { box-shadow: 0 1px 3px rgba(0,0,0,0.25) !important; }
+.dark .shadow     { box-shadow: 0 2px 8px rgba(0,0,0,0.3)  !important; }
+.dark .shadow-md  { box-shadow: 0 4px 16px rgba(0,0,0,0.35) !important; }
+.dark .shadow-lg  { box-shadow: 0 8px 32px rgba(0,0,0,0.4)  !important; }
+
+/* ── Ring colour adjustment ───────────────────────────────────────── */
+.dark .ring-stone-200,
+.dark .ring-gray-200 {
+  --tw-ring-color: var(--border);
+}
+
+/* ── Placeholder stone colour fix ────────────────────────────────── */
+.dark .placeholder-stone-400::placeholder,
+.dark .placeholder-gray-400::placeholder,
+.dark .placeholder-slate-400::placeholder {
+  color: var(--text-faint) !important;
+}
+
+/* ── Inline style bg-[#fff] override via filter (limited scope) ───── */
+/* Pages that use style={{backgroundColor:'white'}} are fixed via body */
+
+/* ── Arbitrary Tailwind hex classes that slip past prefix matching ─── */
+/* These are generated as literal class names and need explicit rules   */
+.dark .\[\#FAF9F6\],
+.dark .bg-\[\#FAF9F6\],
+.dark .bg-\[\#F8F7F4\],
+.dark .bg-\[\#F0EFEC\] {
+  background-color: var(--bg) !important;
+}

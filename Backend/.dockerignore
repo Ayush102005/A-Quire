@@ -1,0 +1,24 @@
+# Never bake secrets or bloat into the image — .env/.env.production are
+# injected at container start via docker-compose.yml's env_file:, not
+# copied in at build time. Without this file, `COPY . .` in the Dockerfile
+# baked the real SECRET_KEY/API keys directly into an image layer — even a
+# file later deleted in a subsequent layer stays recoverable from the
+# image history, so exclusion here (not just careful ordering) is the only
+# real fix.
+.env
+.env.*
+!.env.example
+firebase-credentials.json
+
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.git/
+
+# Local dev/debug artifacts that have accumulated in this directory —
+# harmless to the app but no reason to ship them into a production image.
+local.db
+*.db
+uploads/

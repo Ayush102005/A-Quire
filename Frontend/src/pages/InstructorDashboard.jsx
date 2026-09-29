@@ -291,6 +291,7 @@ function LessonList({ module, course }) {
       if (lessonType === 'video') {
         lessonPayload.video_url = form.video_url.trim();
       } else if (lessonType === 'dsa') {
+        lessonPayload.problem_id = form.problem_id || 'two-sum';
         lessonPayload.category = form.category.trim();
         lessonPayload.difficulty = form.difficulty;
         lessonPayload.topic = form.topic;
@@ -342,6 +343,7 @@ function LessonList({ module, course }) {
       description: '',
       category: '',
       difficulty: 'Medium',
+      problem_id: KNOWN_PROBLEMS[0].id,
       topic: '',
       problem_statement: '',
       examples: '',
@@ -535,52 +537,34 @@ function LessonList({ module, course }) {
                 disabled={saving}
               />
 
+
+              <div>
+                <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Problem Link*</p>
+                <select
+                  value={form.problem_id}
+                  onChange={e => setForm(f => ({ ...f, problem_id: e.target.value }))}
+                  className={inputCls + ' text-xs py-2 w-full'}
+                  disabled={saving}
+                >
+                  <option value="two-sum">Two Sum</option>
+                  <option value="reverse-linked-list">Reverse Linked List</option>
+                  <option value="valid-parentheses">Valid Parentheses</option>
+                  <option value="merge-two-sorted-lists">Merge Two Sorted Lists</option>
+                </select>
+                <p className="text-[9px] text-[var(--text-faint)] mt-1 mb-2">
+                  When a problem is linked, students will be presented with a full coding environment instead of a reference lesson.
+                </p>
+              </div>
+
               <textarea
                 value={form.problem_statement}
                 onChange={e => setForm(f => ({ ...f, problem_statement: e.target.value }))}
-                placeholder="Problem statement description*"
-                rows={2}
-                className={textareaCls + ' text-xs py-2'}
-                disabled={saving}
-                required
-              />
-
-              <textarea
-                value={form.approaches}
-                onChange={e => setForm(f => ({ ...f, approaches: e.target.value }))}
-                placeholder="Approaches and solutions (markdown format)"
+                placeholder="Optional notes or additional context..."
                 rows={2}
                 className={textareaCls + ' text-xs py-2'}
                 disabled={saving}
               />
 
-              <textarea
-                value={form.code_solutions}
-                onChange={e => setForm(f => ({ ...f, code_solutions: e.target.value }))}
-                placeholder="Code solutions (multiple languages, markdown format)"
-                rows={2}
-                className={textareaCls + ' text-xs py-2'}
-                disabled={saving}
-              />
-
-              <div className="grid grid-cols-2 gap-2">
-                <textarea
-                  value={form.complexity_time}
-                  onChange={e => setForm(f => ({ ...f, complexity_time: e.target.value }))}
-                  placeholder="Time Complexity (e.g., O(N^2))"
-                  rows={1}
-                  className={textareaCls + ' text-xs py-2'}
-                  disabled={saving}
-                />
-                <textarea
-                  value={form.complexity_space}
-                  onChange={e => setForm(f => ({ ...f, complexity_space: e.target.value }))}
-                  placeholder="Space Complexity (e.g., O(N^2))"
-                  rows={1}
-                  className={textareaCls + ' text-xs py-2'}
-                  disabled={saving}
-                />
-              </div>
 
               <input
                 type="text"
@@ -648,39 +632,77 @@ function LessonList({ module, course }) {
 // they're not a separate, disconnected quiz system.
 const OPTION_KEYS = ['A', 'B', 'C', 'D'];
 
+// Known problem slugs from problem_bank.py. In a full implementation these
+// would be fetched from GET /problems but for V1 we keep them client-side
+// to avoid an extra round-trip on every panel open.
+const KNOWN_PROBLEMS = [
+  { id: 'two-sum',              label: 'Two Sum (Easy)' },
+  { id: 'reverse-linked-list', label: 'Reverse Linked List (Easy)' },
+];
+
 function LessonQuizPanel({ module, course, onClose }) {
-  const [content, setContent] = useState('');
-  const [options, setOptions] = useState({ A: '', B: '', C: '', D: '' });
+  // Question type: 'mcq' or 'coding' (DSA problem)
+  const [qType, setQType]           = useState('mcq');
+  // MCQ fields
+  const [content, setContent]       = useState('');
+  const [options, setOptions]       = useState({ A: '', B: '', C: '', D: '' });
   const [correctAnswer, setCorrectAnswer] = useState('A');
+  // DSA fields
+  const [problemSlug, setProblemSlug] = useState(KNOWN_PROBLEMS[0].id);
+  const [dsaPrompt, setDsaPrompt]   = useState('');
+  // Shared
   const [difficulty, setDifficulty] = useState('Medium');
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving]         = useState(false);
   const [addedCount, setAddedCount] = useState(0);
 
-  const canSave = content.trim() && OPTION_KEYS.every(k => options[k].trim());
+  const canSaveMcq  = content.trim() && OPTION_KEYS.every(k => options[k].trim());
+  const canSaveDsa  = problemSlug.trim();
+  const canSave     = qType === 'mcq' ? canSaveMcq : canSaveDsa;
+
+  function resetForm() {
+    setContent(''); setOptions({ A: '', B: '', C: '', D: '' }); setCorrectAnswer('A');
+    setDsaPrompt(''); setProblemSlug(KNOWN_PROBLEMS[0].id);
+  }
 
   async function handleAdd(e) {
     e.preventDefault();
     if (!canSave) return;
     setSaving(true);
     try {
-      await api.questions.create({
-        exam: course?.exam_category || 'Other',
-        subject: course?.title || module.title,
-        topic: module.title,
+      const base = {
+        exam:       course?.exam_category || 'Other',
+        subject:    course?.title || module.title,
+        topic:      module.title,
         difficulty,
-        type: 'mcq',
-        tags: [],
-        content: content.trim(),
-        options: OPTION_KEYS.map(k => ({ id: k, text: options[k].trim() })),
-        correct_answer: correctAnswer,
+        tags:       [],
         explanation: '',
-      });
+      };
+
+      if (qType === 'mcq') {
+        await api.questions.create({
+          ...base,
+          type: 'mcq',
+          content: content.trim(),
+          options: OPTION_KEYS.map(k => ({ id: k, text: options[k].trim() })),
+          correct_answer: correctAnswer,
+        });
+      } else {
+        // DSA coding problem — linked by problem slug
+        const problemLabel = KNOWN_PROBLEMS.find(p => p.id === problemSlug)?.label || problemSlug;
+        await api.questions.create({
+          ...base,
+          type: 'coding',
+          content: dsaPrompt.trim() || `Solve the DSA problem: ${problemLabel}`,
+          problem_id: problemSlug,
+          options: [],
+          correct_answer: '',
+        });
+      }
+
       setAddedCount(c => c + 1);
-      setContent('');
-      setOptions({ A: '', B: '', C: '', D: '' });
-      setCorrectAnswer('A');
+      resetForm();
     } catch (err) {
-      alert('Failed to add quiz question: ' + err.message);
+      alert('Failed to add question: ' + err.message);
     } finally {
       setSaving(false);
     }
@@ -688,9 +710,10 @@ function LessonQuizPanel({ module, course, onClose }) {
 
   return (
     <form onSubmit={handleAdd} className="mt-1.5 mb-2 space-y-2.5 bg-[var(--card-bg)] border border-teal-200 rounded-lg p-3">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <p className="text-[10px] font-semibold text-teal-700 uppercase tracking-wider">
-          Quiz question — {module.title}
+          Add question — {module.title}
         </p>
         <button type="button" onClick={onClose} className="text-[var(--text-faint)] hover:text-[var(--text)] transition-colors">
           <X className="w-3.5 h-3.5" />
@@ -703,40 +726,104 @@ function LessonQuizPanel({ module, course, onClose }) {
         </p>
       )}
 
-      <textarea
-        value={content}
-        onChange={e => setContent(e.target.value)}
-        placeholder="Question text*"
-        rows={2}
-        className={textareaCls + ' text-xs py-2'}
-        disabled={saving}
-      />
-
-      <div className="space-y-1.5">
-        {OPTION_KEYS.map(k => (
-          <label key={k} className="flex items-center gap-2">
+      {/* Question Type Toggle */}
+      <div>
+        <p className="text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">Question Type</p>
+        <div className="flex gap-3">
+          <label className="flex items-center gap-1.5 cursor-pointer">
             <input
               type="radio"
-              name={`correct-${module.id}`}
-              checked={correctAnswer === k}
-              onChange={() => setCorrectAnswer(k)}
-              disabled={saving}
-              title="Mark as correct answer"
-            />
-            <span className="text-[10px] font-mono text-[var(--text-faint)] w-3 shrink-0">{k}</span>
-            <input
-              type="text"
-              value={options[k]}
-              onChange={e => setOptions(o => ({ ...o, [k]: e.target.value }))}
-              placeholder={`Option ${k}*`}
-              className={inputCls + ' text-xs py-1.5 flex-1'}
+              name={`qtype-${module.id}`}
+              value="mcq"
+              checked={qType === 'mcq'}
+              onChange={() => { setQType('mcq'); resetForm(); }}
               disabled={saving}
             />
+            <span className="text-xs text-[var(--text)]">MCQ</span>
           </label>
-        ))}
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="radio"
+              name={`qtype-${module.id}`}
+              value="coding"
+              checked={qType === 'coding'}
+              onChange={() => { setQType('coding'); resetForm(); }}
+              disabled={saving}
+            />
+            <span className="text-xs text-[var(--text)]">DSA Problem</span>
+          </label>
+        </div>
       </div>
-      <p className="text-[9px] text-[var(--text-faint)]">Select the radio button next to the correct option.</p>
 
+      {/* MCQ fields */}
+      {qType === 'mcq' && (
+        <>
+          <textarea
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            placeholder="Question text*"
+            rows={2}
+            className={textareaCls + ' text-xs py-2'}
+            disabled={saving}
+          />
+          <div className="space-y-1.5">
+            {OPTION_KEYS.map(k => (
+              <label key={k} className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name={`correct-${module.id}`}
+                  checked={correctAnswer === k}
+                  onChange={() => setCorrectAnswer(k)}
+                  disabled={saving}
+                  title="Mark as correct answer"
+                />
+                <span className="text-[10px] font-mono text-[var(--text-faint)] w-3 shrink-0">{k}</span>
+                <input
+                  type="text"
+                  value={options[k]}
+                  onChange={e => setOptions(o => ({ ...o, [k]: e.target.value }))}
+                  placeholder={`Option ${k}*`}
+                  className={inputCls + ' text-xs py-1.5 flex-1'}
+                  disabled={saving}
+                />
+              </label>
+            ))}
+          </div>
+          <p className="text-[9px] text-[var(--text-faint)]">Select the radio button next to the correct option.</p>
+        </>
+      )}
+
+      {/* DSA Problem fields */}
+      {qType === 'coding' && (
+        <>
+          <div>
+            <p className="text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">Problem*</p>
+            <select
+              value={problemSlug}
+              onChange={e => setProblemSlug(e.target.value)}
+              className={inputCls + ' text-xs py-1.5 w-full'}
+              disabled={saving}
+            >
+              {KNOWN_PROBLEMS.map(p => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
+          </div>
+          <textarea
+            value={dsaPrompt}
+            onChange={e => setDsaPrompt(e.target.value)}
+            placeholder="Optional prompt shown to the student (e.g. 'Solve using a hash map')"
+            rows={2}
+            className={textareaCls + ' text-xs py-2'}
+            disabled={saving}
+          />
+          <p className="text-[9px] text-[var(--text-faint)]">
+            Students will be taken to the interactive code editor for this problem.
+          </p>
+        </>
+      )}
+
+      {/* Footer row: difficulty + submit */}
       <div className="flex items-center gap-2">
         <select
           value={difficulty}
@@ -754,7 +841,7 @@ function LessonQuizPanel({ module, course, onClose }) {
           className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-teal-700 text-white text-xs font-semibold disabled:opacity-50 hover:bg-teal-800 transition-colors"
         >
           {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-          Add Question
+          Add {qType === 'coding' ? 'DSA' : 'MCQ'} Question
         </button>
       </div>
     </form>

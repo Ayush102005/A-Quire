@@ -24,6 +24,7 @@ import uuid
 from collections.abc import AsyncGenerator
 from typing import Any
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -67,6 +68,18 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
+# ── Rate limiter reset between tests ─────────────────────────────────────
+# All tests share the same in-memory counter. Without resetting it, the
+# test suite would exhaust per-IP limits mid-run and get 429 errors.
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    """Reset the rate limiter's in-memory counters before and after every test."""
+    from app.core.rate_limit import reset_all_limits
+    reset_all_limits()
+    yield
+    reset_all_limits()
+
+
 # ── Override get_db dependency to use test SQLite DB ──────────────────────
 @pytest_asyncio.fixture()
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
@@ -97,7 +110,7 @@ async def student_tokens(client: AsyncClient) -> dict[str, Any]:
     """Register a fresh student for each test and return tokens."""
     reg = await client.post("/api/v1/auth/register", json={
         "email": _unique_email("student"),
-        "password": "pass123",
+        "password": "pass1234",
         "full_name": "Test Student",
         "role": "student",
     })
@@ -110,7 +123,7 @@ async def instructor_tokens(client: AsyncClient) -> dict[str, Any]:
     """Register a fresh instructor for each test and return tokens."""
     reg = await client.post("/api/v1/auth/register", json={
         "email": _unique_email("instructor"),
-        "password": "pass123",
+        "password": "pass1234",
         "full_name": "Test Instructor",
         "role": "instructor",
     })
