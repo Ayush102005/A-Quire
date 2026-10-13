@@ -8,7 +8,13 @@ const AUTOSAVE_DELAY_MS = 1200;
  * persisted server-side (per user, per lesson) rather than sessionStorage,
  * so they survive across devices and browser sessions.
  */
-export default function PersonalNotesPanel({ lessonId, placeholder = 'Take notes here while you watch...', className = '' }) {
+export default function PersonalNotesPanel({ 
+  lessonId, 
+  placeholder = 'Take notes here while you watch...', 
+  className = '',
+  id = 'personal-notes-panel',
+  textareaId = 'personal-notes-textarea'
+}) {
   const [content, setContent] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [saveState, setSaveState] = useState('idle'); // idle | saving | saved | error
@@ -20,7 +26,10 @@ export default function PersonalNotesPanel({ lessonId, placeholder = 'Take notes
     let cancelled = false;
     setLoaded(false);
     setSaveState('idle');
-    if (!lessonId) return;
+    if (!lessonId) {
+      setLoaded(true);
+      return;
+    }
 
     api.myNotes.get(lessonId)
       .then((note) => {
@@ -84,17 +93,23 @@ export default function PersonalNotesPanel({ lessonId, placeholder = 'Take notes
   }[saveState];
 
   return (
-    <div className={`h-full flex flex-col ${className}`}>
-      <div className="flex items-center justify-between mb-2 px-1">
-        <span className="text-xs text-[var(--text-muted)]">Private to you — synced to your account.</span>
+    <div id={id} data-testid={id} className={`h-full flex-1 min-h-0 flex flex-col ${className}`}>
+      <div className="flex items-center justify-between mb-2 px-1 shrink-0">
+        <span className="text-xs text-[var(--text-muted)] dark:text-stone-400">Private to you — synced to your account.</span>
         {statusLabel && (
-          <span className={`text-xs ${saveState === 'error' ? 'text-red-600' : 'text-[var(--text-muted)]'}`}>
+          <span 
+            id={`${id}-status`}
+            data-testid={`${id}-status`}
+            className={`text-xs ${saveState === 'error' ? 'text-red-500' : 'text-[var(--text-muted)] dark:text-stone-400'}`}
+          >
             {statusLabel}
           </span>
         )}
       </div>
       <textarea
-        className="flex-1 w-full p-4 border border-[var(--border)] rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm text-[var(--text)] bg-[var(--surface)]"
+        id={textareaId}
+        data-testid={textareaId}
+        className="flex-1 min-h-0 h-full w-full p-4 border border-[var(--border)] dark:border-stone-700/80 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-sm text-[var(--text)] dark:text-stone-100 bg-[var(--surface)] dark:bg-stone-900/80 placeholder-stone-400 dark:placeholder-stone-500 transition-colors"
         placeholder={placeholder}
         value={content}
         onChange={handleChange}

@@ -7,13 +7,18 @@ function formatTime(seconds) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export default function TranscriptPanel({ segments, currentTime, onSeek }) {
+export default function TranscriptPanel({ segments, currentTime, onSeek, lang = 'original', onLangChange, isLoading = false }) {
   const activeRef = useRef(null);
 
-  // Find active segment
-  const activeId = segments.find(
-    (seg) => currentTime >= seg.start && currentTime <= seg.end
-  )?.id ?? null;
+  // Find active segment with fallback for gaps between segments
+  const activeId = (() => {
+    if (!segments?.length) return null;
+    const idx = segments.findIndex(s => currentTime >= s.start && currentTime <= (s.end ?? s.start + 9999));
+    if (idx >= 0) return segments[idx].id;
+    // Fallback: last segment whose start is before current time
+    const fallbackIdx = segments.reduce((best, s, i) => (s.start <= currentTime ? i : best), -1);
+    return fallbackIdx >= 0 ? segments[fallbackIdx].id : null;
+  })();
 
   // Auto-scroll to active segment
   useEffect(() => {
@@ -31,12 +36,32 @@ export default function TranscriptPanel({ segments, currentTime, onSeek }) {
   }, [activeId]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
+      {isLoading && (
+        <div className="absolute inset-0 bg-surface/50 z-10 flex items-center justify-center">
+          <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full" />
+        </div>
+      )}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0 bg-surface">
         <h2 className="text-sm font-semibold text-text flex items-center gap-2">
           <Clock className="w-4 h-4 text-muted" />
           Interactive Transcript
         </h2>
+        {onLangChange && (
+          <select 
+            value={lang} 
+            onChange={(e) => onLangChange(e.target.value)}
+            className="text-xs bg-surface-soft border border-border rounded px-2 py-1 outline-none focus:ring-1 focus:ring-primary"
+            aria-label="Select transcript language"
+          >
+            <option value="original">Original</option>
+            <option value="en">English</option>
+            <option value="hi">Hindi</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+          </select>
+        )}
       </div>
 
       <div

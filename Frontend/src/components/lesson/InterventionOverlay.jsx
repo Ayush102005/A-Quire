@@ -125,8 +125,10 @@ export default function InterventionOverlay({ onResume, onHint, onExplain, onHin
 
           {/* Primary action */}
           <button
+            id="intervention-resume-btn"
+            data-testid="intervention-resume-btn"
             onClick={onResume}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-[var(--primary)] text-white text-sm font-semibold rounded-xl hover:opacity-90 active:scale-[0.98] transition-all mb-3 focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 focus-visible:outline-none shadow-sm"
+            className="w-full flex items-center justify-center gap-2 py-3 bg-[var(--primary)] text-white text-sm font-semibold rounded-xl hover:opacity-90 active:scale-[0.98] transition-all mb-3 focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 focus-visible:outline-none shadow-sm cursor-pointer"
             autoFocus
             aria-label="Resume the lesson"
           >
@@ -137,8 +139,10 @@ export default function InterventionOverlay({ onResume, onHint, onExplain, onHin
           {/* Secondary actions grid */}
           <div className="grid grid-cols-2 gap-2 mb-2">
             <button
+              id="intervention-hint-btn"
+              data-testid="intervention-hint-btn"
               onClick={() => { onHint(); onExpand(); }}
-              className="flex flex-col items-center gap-1.5 py-3 px-3 border border-border rounded-xl hover:bg-surface-soft hover:border-stone-300 transition-all group focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              className="flex flex-col items-center gap-1.5 py-3 px-3 border border-border rounded-xl hover:bg-surface-soft hover:border-stone-300 transition-all group focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none cursor-pointer"
               aria-label="I need a hint"
             >
               <Lightbulb className="w-4 h-4 text-amber-500 group-hover:scale-110 transition-transform" />
@@ -146,8 +150,10 @@ export default function InterventionOverlay({ onResume, onHint, onExplain, onHin
             </button>
 
             <button
+              id="intervention-explain-btn"
+              data-testid="intervention-explain-btn"
               onClick={() => { onExplain(); onExpand(); }}
-              className="flex flex-col items-center gap-1.5 py-3 px-3 border border-border rounded-xl hover:bg-surface-soft hover:border-stone-300 transition-all group focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              className="flex flex-col items-center gap-1.5 py-3 px-3 border border-border rounded-xl hover:bg-surface-soft hover:border-stone-300 transition-all group focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none cursor-pointer"
               aria-label="Explain simply"
             >
               <BookOpen className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
@@ -155,8 +161,10 @@ export default function InterventionOverlay({ onResume, onHint, onExplain, onHin
             </button>
 
             <button
+              id="intervention-replay-btn"
+              data-testid="intervention-replay-btn"
               onClick={onReplay}
-              className="flex flex-col items-center gap-1.5 py-3 px-3 border border-border rounded-xl hover:bg-surface-soft hover:border-stone-300 transition-all group focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              className="flex flex-col items-center gap-1.5 py-3 px-3 border border-border rounded-xl hover:bg-surface-soft hover:border-stone-300 transition-all group focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none cursor-pointer"
               aria-label="Replay last 30s"
             >
               <RotateCcw className="w-4 h-4 text-muted group-hover:scale-110 transition-transform" />
@@ -164,8 +172,10 @@ export default function InterventionOverlay({ onResume, onHint, onExplain, onHin
             </button>
 
             <button
+              id="intervention-hinglish-btn"
+              data-testid="intervention-hinglish-btn"
               onClick={() => { onHinglish(); onExpand(); }}
-              className="flex flex-col items-center gap-1.5 py-3 px-3 border border-border rounded-xl hover:bg-surface-soft hover:border-stone-300 transition-all group focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              className="flex flex-col items-center gap-1.5 py-3 px-3 border border-border rounded-xl hover:bg-surface-soft hover:border-stone-300 transition-all group focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none cursor-pointer"
               aria-label="Ask in Hinglish"
             >
               <Globe className="w-4 h-4 text-secondary group-hover:scale-110 transition-transform" />

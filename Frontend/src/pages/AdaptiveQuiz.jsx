@@ -36,6 +36,10 @@ export default function AdaptiveQuiz() {
     return raw > 0 ? raw : 5;
   });
   const TARGET_PRESETS = [5, 10, 20];
+  
+  const [isExamMode, setIsExamMode] = useState(() => {
+    return new URLSearchParams(window.location.search).get('mode') === 'exam';
+  });
 
   // Current Question State
   const [question, setQuestion] = useState(null);
@@ -250,6 +254,19 @@ export default function AdaptiveQuiz() {
             />
           </label>
 
+          <label className="flex items-center gap-3 mb-6 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isExamMode}
+              onChange={(e) => setIsExamMode(e.target.checked)}
+              className="w-5 h-5 text-teal-600 border-stone-300 rounded focus:ring-teal-500"
+            />
+            <div className="text-left">
+              <span className="block text-sm font-semibold text-stone-900">Strict Exam Mode</span>
+              <span className="block text-xs text-stone-500">Hide feedback until the end of the session</span>
+            </div>
+          </label>
+
           <button
             onClick={startQuiz}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold transition-all shadow-sm"
@@ -296,8 +313,15 @@ export default function AdaptiveQuiz() {
             <Sparkles className="w-9 h-9 text-teal-600" />
           </div>
           <h2 className="text-2xl font-bold text-stone-900 mb-2">Session Complete!</h2>
-          <p className="text-stone-500 mb-8">The Adaptive Engine has successfully measured your ability.</p>
+          <p className={`text-stone-500 ${isExamMode ? 'mb-4' : 'mb-8'}`}>The Adaptive Engine has successfully measured your ability.</p>
           
+          {isExamMode && (
+            <div className="mb-8 p-4 bg-teal-50 border border-teal-200 rounded-xl text-teal-800 text-sm text-left">
+              <strong>Exam Mode Completed</strong><br />
+              Your final score is {Math.round(marks * 100) / 100} / {totalMarks}. All explanations and feedback would be reviewed here.
+            </div>
+          )}
+
           <a href="/dashboard" className="flex items-center justify-center gap-2 py-3 w-full rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold transition-all shadow-sm">
             Return to Dashboard <ChevronRight className="w-4 h-4" />
           </a>
@@ -390,7 +414,7 @@ export default function AdaptiveQuiz() {
                 const isSelected = selected === key;
                 let optionStyle = 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50 cursor-pointer';
 
-                if (hasSubmitted) {
+                if (hasSubmitted && !isExamMode) {
                   if (isSelected && isCorrect) optionStyle = 'border-emerald-400 bg-emerald-50 text-emerald-900';
                   else if (isSelected && !isCorrect) optionStyle = 'border-red-300 bg-red-50/50 text-red-800';
                   else optionStyle = 'border-stone-100 bg-stone-50 text-stone-400 opacity-60';
@@ -407,8 +431,8 @@ export default function AdaptiveQuiz() {
                     className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-xl border-2 text-left transition-all duration-150 focus-visible:outline-none disabled:cursor-default ${optionStyle}`}
                   >
                     <div className={`w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 transition-all font-bold text-xs ${
-                      hasSubmitted && isSelected && isCorrect ? 'border-emerald-500 bg-emerald-500 text-white' :
-                      hasSubmitted && isSelected && !isCorrect ? 'border-red-400 bg-red-400 text-white' :
+                      hasSubmitted && !isExamMode && isSelected && isCorrect ? 'border-emerald-500 bg-emerald-500 text-white' :
+                      hasSubmitted && !isExamMode && isSelected && !isCorrect ? 'border-red-400 bg-red-400 text-white' :
                       isSelected ? 'border-teal-600 bg-teal-600 text-white' : 'border-stone-300 text-stone-500'
                     }`}>
                       {key}
@@ -423,7 +447,7 @@ export default function AdaptiveQuiz() {
             </div>
 
             {/* Result banner & Diagnostic Flow */}
-            {hasSubmitted && meta && (
+            {hasSubmitted && meta && !isExamMode && (
               <div className="px-6 sm:px-8 pb-5">
                 <div className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border ${meta.bg} ${meta.border} mb-4`}>
                   <meta.icon className={`w-4 h-4 shrink-0 ${meta.iconColor}`} />
@@ -484,7 +508,7 @@ export default function AdaptiveQuiz() {
 
             {/* Action Buttons */}
             <div className="px-6 sm:px-8 py-5 border-t border-stone-100 bg-stone-50/50 flex flex-col gap-4">
-              {!hasSubmitted && (
+              {!hasSubmitted && !isExamMode && (
                 <ConfidenceSelector 
                   value={confidence} 
                   onChange={setConfidence} 
@@ -507,9 +531,9 @@ export default function AdaptiveQuiz() {
               ) : (
                 <button
                   onClick={handleNext}
-                  disabled={!isCorrect && submitState === 'result'} // Force them to answer the diagnostic loop first, wait, maybe optional?
+                  disabled={!isExamMode && !isCorrect && submitState === 'result'} // Force them to answer the diagnostic loop first
                   className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm focus-visible:outline-none ${
-                    (!isCorrect && submitState === 'result') 
+                    (!isExamMode && !isCorrect && submitState === 'result') 
                     ? 'bg-stone-200 text-stone-400 cursor-not-allowed' // Force diagnostic loop
                     : 'bg-teal-700 hover:bg-teal-800 text-white cursor-pointer'
                   }`}
@@ -522,7 +546,7 @@ export default function AdaptiveQuiz() {
             </div>
             
             {/* Note to skip diagnostic for testing if forced */}
-            {!isCorrect && submitState === 'result' && (
+            {!isExamMode && !isCorrect && submitState === 'result' && (
               <div className="px-8 pb-3 text-right">
                 <button 
                   onClick={() => setSubmitState('diagnostic_result')} // Bypass hack for demo

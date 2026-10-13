@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, BookOpen, Users, BarChart2, Settings, X } from 'lucide-react';
-import { getCurrentUser } from '../services/api';
+import { LayoutDashboard, BookOpen, Users, BarChart2, Settings, X, Terminal, LogOut } from 'lucide-react';
+import { getCurrentUser, api } from '../services/api';
 
 const NAV = [
   { id: 'overview', icon: LayoutDashboard, label: 'Overview', href: '/instructor?tab=overview' },
@@ -16,6 +16,11 @@ export default function InstructorSidebar({ sidebarOpen = true, mobileOpen = fal
   const location = useLocation();
   const user = getCurrentUser() || { full_name: 'Instructor', role: 'instructor' };
   const initials = user.full_name ? user.full_name.charAt(0).toUpperCase() : 'I';
+
+  const handleLogout = () => {
+    api.logout();
+    navigate('/login');
+  };
 
   // Desktop Body
   const desktopBody = (
@@ -45,7 +50,7 @@ export default function InstructorSidebar({ sidebarOpen = true, mobileOpen = fal
           );
         })}
       </nav>
-      <div className="p-3 border-t border-[var(--border)] shrink-0">
+      <div className="p-3 border-t border-[var(--border)] shrink-0 space-y-1">
         <div className={`flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-[var(--surface-2)] cursor-pointer ${!sidebarOpen && 'justify-center'}`} onClick={() => navigate('/settings')}>
           <div className="w-7 h-7 rounded-full bg-teal-700 text-white text-xs font-bold flex items-center justify-center shrink-0">{initials}</div>
           {sidebarOpen && (
@@ -55,6 +60,13 @@ export default function InstructorSidebar({ sidebarOpen = true, mobileOpen = fal
             </div>
           )}
         </div>
+        <button
+          onClick={handleLogout}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 sidebar-nav-item text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 ${!sidebarOpen && 'justify-center'}`}
+        >
+          <LogOut className="w-4 h-4 shrink-0" />
+          {sidebarOpen && "Logout"}
+        </button>
       </div>
     </aside>
   );
@@ -101,7 +113,7 @@ export default function InstructorSidebar({ sidebarOpen = true, mobileOpen = fal
                   );
                 })}
               </nav>
-              <div className="p-3 border-t border-[var(--border)] shrink-0">
+              <div className="p-3 border-t border-[var(--border)] shrink-0 space-y-1">
                 <div className="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-[var(--surface-2)] cursor-pointer" onClick={() => navigate('/settings')}>
                   <div className="w-7 h-7 rounded-full bg-teal-700 text-white text-xs font-bold flex items-center justify-center shrink-0">{initials}</div>
                   <div className="min-w-0">
@@ -109,6 +121,16 @@ export default function InstructorSidebar({ sidebarOpen = true, mobileOpen = fal
                     <p className="text-[10px] text-[var(--text-faint)] truncate capitalize">{user.role}</p>
                   </div>
                 </div>
+                <button
+                  onClick={() => {
+                    setMobileOpen(false);
+                    handleLogout();
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 sidebar-nav-item text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                >
+                  <LogOut className="w-4 h-4 shrink-0" />
+                  Logout
+                </button>
               </div>
           </div>
         </div>

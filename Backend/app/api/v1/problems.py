@@ -771,6 +771,12 @@ class SubmitRequest(BaseModel):
     language: str
 
 
+class ExecuteRequest(BaseModel):
+    code: str
+    language: str
+    stdin: str = ""
+
+
 # ── Raw execution helpers (Run Code mode) ───────────────────────────────────
 #
 # Run Code is NOT a judge: it executes the student's code verbatim with the
@@ -925,6 +931,7 @@ async def run_code(
     problem_id: str,
     payload: RunRequest,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
     _rl: None = rate_limit(20, 60),  # 20 runs / minute per IP
 ) -> dict:
     """
@@ -935,6 +942,18 @@ async def run_code(
     """
     p = _get_problem_or_404(problem_id)
     test_cases = p.get("_test_cases", [])
+    # Lesson-authored problems (not in static bank): load test cases from DB
+    if not test_cases:
+        from sqlalchemy import select
+        from app.models.lesson import Lesson as _Lesson
+        _q = await db.execute(select(_Lesson).where(_Lesson.problem_id == problem_id))
+        _db_lesson = _q.scalars().first()
+        if _db_lesson and _db_lesson.test_cases:
+            test_cases = [
+                (tc.get("input", ""), tc.get("expected_output", ""))
+                for tc in _db_lesson.test_cases
+            ]
+
 
     if payload.language.lower() not in _SUPPORTED_LANGUAGES:
         return {
@@ -979,10 +998,23 @@ async def submit_code(
     problem_id: str,
     payload: SubmitRequest,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
     _rl: None = rate_limit(10, 60),  # 10 submissions / minute per IP
 ) -> dict:
     p = _get_problem_or_404(problem_id)
     test_cases = p.get("_test_cases", [])
+
+    # Lesson-authored problems: load test cases from DB
+    if not test_cases:
+        from sqlalchemy import select
+        from app.models.lesson import Lesson as _Lesson
+        _q = await db.execute(select(_Lesson).where(_Lesson.problem_id == problem_id))
+        _db_lesson = _q.scalars().first()
+        if _db_lesson and _db_lesson.test_cases:
+            test_cases = [
+                (tc.get("input", ""), tc.get("expected_output", ""))
+                for tc in _db_lesson.test_cases
+            ]
 
     if payload.language.lower() not in _SUPPORTED_LANGUAGES:
         return {
@@ -1028,6 +1060,33 @@ async def submit_code(
         "verdict": verdict,
         "message": message,
         "test_results": results,
+    }
+
+
+@router.post("/execute")
+async def execute_code(
+    payload: ExecuteRequest,
+    current_user: User = Depends(get_current_user),
+    _rl: None = rate_limit(20, 60),  # 20 runs / minute per IP
+) -> dict:
+    """
+    Free-run endpoint: execute student code verbatim with provided stdin and
+    return raw stdout/stderr. No test-case comparison — used by lesson-authored
+    DSA problems that have no structured test cases but still need a REPL-like
+    \"Run Code\" experience.
+    """
+    if payload.language.lower() not in _SUPPORTED_LANGUAGES:
+        return {
+            "status": "LANGUAGE_NOT_SUPPORTED",
+            "stdout": "",
+            "stderr": f"'{payload.language}' isn't supported. Supported: {', '.join(_SUPPORTED_LANGUAGES)}.",
+        }
+
+    stdout, stderr = _execute_raw(payload.language, payload.code, payload.stdin)
+    return {
+        "status": "ERROR" if stderr else "SUCCESS",
+        "stdout": stdout,
+        "stderr": stderr,
     }
 
 

@@ -1,9 +1,9 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Home, BookOpen, LineChart, Bell, User, Settings as SettingsIcon, X
+  Home, BookOpen, LineChart, Bell, User, Settings as SettingsIcon, X, LogOut
 } from 'lucide-react';
-import { getCurrentUser } from '../services/api';
+import { getCurrentUser, api } from '../services/api';
 
 const STUDENT_NAV = [
   { name: 'Dashboard',     icon: Home,        href: '/dashboard' },
@@ -14,7 +14,13 @@ const STUDENT_NAV = [
 
 export default function StudentSidebar({ sidebarOpen = true, mobileOpen = false, setMobileOpen, activeId, unreadCount = 0 }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const currentPath = activeId || location.pathname;
+
+  const handleLogout = () => {
+    api.logout();
+    navigate('/login');
+  };
 
   const desktopBody = (
     <aside className={`shrink-0 flex flex-col sidebar-light transition-all duration-300 h-full border-r border-[var(--border)] ${sidebarOpen ? 'w-64' : 'w-20'}`}>
@@ -57,6 +63,13 @@ export default function StudentSidebar({ sidebarOpen = true, mobileOpen = false,
           <User className={`w-4 h-4 shrink-0 ${currentPath === '/settings' ? 'text-teal-700 dark:text-teal-400' : ''}`} />
           {sidebarOpen && "Profile & Settings"}
         </Link>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 sidebar-nav-item text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+        >
+          <LogOut className="w-4 h-4 shrink-0" />
+          {sidebarOpen && "Logout"}
+        </button>
       </div>
     </aside>
   );
@@ -117,6 +130,16 @@ export default function StudentSidebar({ sidebarOpen = true, mobileOpen = false,
                 <User className={`w-4 h-4 shrink-0 ${currentPath === '/settings' ? 'text-teal-700 dark:text-teal-400' : ''}`} />
                 Profile & Settings
               </Link>
+              <button
+                onClick={() => {
+                  setMobileOpen(false);
+                  handleLogout();
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 sidebar-nav-item text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
+                <LogOut className="w-4 h-4 shrink-0" />
+                Logout
+              </button>
             </div>
           </div>
         </div>

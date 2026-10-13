@@ -24,6 +24,8 @@ from app.api.v1.quizzes import router as quizzes_router
 from app.api.v1.problems import router as problems_router
 from app.api.v1.questions import router as questions_router
 from app.api.v1.meetings import router as meetings_router
+from app.api.v1.admin import router as admin_router
+from app.api.v1.mentor import router as mentor_router
 
 api_router = APIRouter()
 
@@ -44,3 +46,5 @@ api_router.include_router(quizzes_router)
 api_router.include_router(problems_router)
 api_router.include_router(questions_router)
 api_router.include_router(meetings_router)
+api_router.include_router(admin_router)
+api_router.include_router(mentor_router)

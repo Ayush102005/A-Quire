@@ -505,6 +505,7 @@ export const api = {
     async fetchTranscript(lessonId) {
       return request(`/courses/lessons/${lessonId}/fetch-transcript`, { method: "POST" });
     },
+
     // Study material — instructor upload/remove of a lesson's PDF.
     // Instructor-authored notes reuse updateLesson({ notes_content }) above.
     async uploadLessonPdf(lessonId, file) {
@@ -524,6 +525,9 @@ export const api = {
   lessons: {
     async get(id) {
       return request(`/content/lessons/${id}`);
+    },
+    async fetchTranslatedTranscript(lessonId, lang = "en") {
+      return request(`/courses/lessons/${lessonId}/transcript?lang=${lang}`, { method: "GET" });
     },
     // Fetches the lesson's PDF as an authenticated blob and returns an
     // object URL suitable for an <iframe>/<embed> src. Can't just point
@@ -739,6 +743,66 @@ export const api = {
       return request(`/problems/${problemId}/submit`, {
         method: "POST",
         body: JSON.stringify({ code, language }),
+      });
+    },
+    // Free-run mode for lesson-authored problems (no structured test cases):
+    // executes code with provided stdin and returns raw stdout/stderr.
+    async execute(code, language, stdin = "") {
+      return request(`/problems/execute`, {
+        method: "POST",
+        body: JSON.stringify({ code, language, stdin }),
+      });
+    },
+    async contributeTestCase(problemId, { input, expected, explanation }) {
+      return request(`/problems/${problemId}/contribute-testcase`, {
+        method: "POST",
+        body: JSON.stringify({ input, expected_output: expected, explanation }),
+      });
+    },
+  },
+
+  // Admin dashboard
+  admin: {
+    async getDashboard() {
+      return request("/admin/dashboard");
+    },
+    async addInstitution(data) {
+      return request("/admin/institutions", {
+        method: "POST",
+        body: JSON.stringify(data)
+      });
+    },
+    async updateUserRole(userId, role) {
+      return request(`/admin/users/${userId}/role`, {
+        method: "PUT",
+        body: JSON.stringify({ role })
+      });
+    },
+    async updateUserInstitution(userId, institutionId) {
+      return request(`/admin/users/${userId}/institution`, {
+        method: "PUT",
+        body: JSON.stringify({ institution_id: institutionId })
+      });
+    },
+    async updateUserStatus(userId, isActive) {
+      return request(`/admin/users/${userId}/status`, {
+        method: "PUT",
+        body: JSON.stringify({ is_active: isActive })
+      });
+    },
+    async resolveModeration(reportId) {
+      return request(`/admin/moderation/${reportId}/resolve`, {
+        method: "PUT"
+      });
+    }
+  },
+
+  // Global Mentor Chat
+  mentor: {
+    async chat(message, history = []) {
+      return request("/mentor/chat", {
+        method: "POST",
+        body: JSON.stringify({ message, history }),
       });
     },
   },

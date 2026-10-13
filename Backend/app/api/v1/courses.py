@@ -97,8 +97,11 @@ router = APIRouter(prefix="/courses", tags=["Courses"])
 
 
 def _require_course_owner(course: Course, user: User) -> None:
-    if user.role != "admin" and course.instructor_id != user.id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="You do not own this course.")
+    if user.role != "admin":
+        if course.instructor_id != user.id:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail="You do not own this course.")
+        if course.institution_id and user.institution_id != course.institution_id:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Cross-institution modification is not permitted.")
 
 
 async def _load_course(db: AsyncSession, course_id: int, with_content: bool = False) -> Course:
@@ -168,7 +171,16 @@ async def create_course(
     db: AsyncSession = Depends(get_db),
     _rl: None = rate_limit(30, 60),
 ) -> Course:
-    course = Course(title=body.title, description=body.description, exam_category=body.exam_category, instructor_id=current_user.id)
+    if not current_user.institution_id and current_user.role != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="You must be assigned to an institution before creating a course.")
+        
+    course = Course(
+        title=body.title, 
+        description=body.description, 
+        exam_category=body.exam_category, 
+        instructor_id=current_user.id,
+        institution_id=current_user.institution_id
+    )
     db.add(course)
     await db.flush()
     return await _load_course(db, course.id, with_content=True)
@@ -308,7 +320,7 @@ async def create_lesson(
         problem_statement=body.problem_statement, examples=body.examples,
         constraints=body.constraints, approaches=body.approaches,
         code_solutions=body.code_solutions, complexity_time=body.complexity_time,
-        complexity_space=body.complexity_space, external_links=body.external_links
+        complexity_space=body.complexity_space, external_links=body.external_links,
     )
     
     if lesson.video_url:
@@ -376,6 +388,31 @@ async def fetch_transcript(
     lesson.transcript = transcript
     await db.flush()
     return lesson
+
+@router.get("/lessons/{lesson_id}/transcript", response_model=list[dict],
+             summary="Fetch actual transcript for a YouTube video lesson in a specific language dynamically")
+async def get_translated_transcript(
+    lesson_id: int,
+    lang: str = "en",
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _rl: None = rate_limit(30, 60),
+) -> list[dict]:
+    lesson = await _load_lesson_with_course(db, lesson_id)
+    # Check if student is enrolled or user is instructor (already checked by existing logic in course/lesson loading maybe? Actually we just need to return the transcript)
+    
+    if not lesson.video_url:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Lesson has no video URL.")
+        
+    try:
+        transcript = fetch_youtube_transcript(lesson.video_url, target_lang=lang)
+    except Exception as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Could not fetch transcript in language {lang}: {str(e)}")
+        
+    if not transcript:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Could not fetch transcript. Make sure the URL is a valid YouTube video with closed captions.")
+        
+    return transcript
 
 
 @router.post("/lessons/{lesson_id}/pdf", response_model=LessonResponse,

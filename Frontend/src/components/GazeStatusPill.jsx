@@ -80,16 +80,13 @@ export const GazeStatusPill = ({
           <span className="hidden sm:inline">Compatibility tracking active</span>
           <span className="sm:hidden">Legacy tracking</span>
         </div>
-        {trackerHealth?.fallbackReason && (
-          // Deliberately NOT truncated — the whole point of surfacing this
-          // is to be screenshot-able. A truncated diagnostic string (e.g.
-          // "startup_health_check_failed (detectCalls=142, facesFound=0,
-          // ...") that cuts off exactly the numbers that matter defeats the
-          // purpose. Wraps instead of overflowing the toolbar.
+        {/* 
+          trackerHealth?.fallbackReason && (
           <span className="text-xs text-[var(--text-faint)] font-mono whitespace-normal break-words max-w-md">
             reason: {trackerHealth.fallbackReason}
           </span>
-        )}
+        ) 
+        */}
       </div>
     );
   }

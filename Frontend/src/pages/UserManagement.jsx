@@ -1,7 +1,8 @@
 import React,{useState,useMemo}from'react';
-import{Home,Users,BookOpen,BarChart2,Settings,Bell,Menu,X,Search,ChevronLeft,ChevronRight,MoreHorizontal,Filter,Trash2,UserCheck,UserX,Download,Shield,Mail,Clock,Building,CheckSquare,Square,AlertTriangle,CheckCircle2,XCircle,Loader2,ChevronDown}from'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import{Home,Users,BookOpen,BarChart2,Settings,Bell,Menu,X,Search,ChevronLeft,ChevronRight,MoreHorizontal,Filter,Trash2,UserCheck,UserX,Download,Shield,Mail,Clock,Building,CheckSquare,Square,AlertTriangle,CheckCircle2,XCircle,Loader2,ChevronDown,LogOut}from'lucide-react';
 import ThemeToggle from'../components/ThemeToggle';
-
+import { api } from '../services/api';
 const NAV=[{name:'Dashboard',icon:Home,href:'/admin'},{name:'Users',icon:Users,href:'/users',active:true},{name:'Courses',icon:BookOpen,href:'#'},{name:'Analytics',icon:BarChart2,href:'#'},{name:'Notifications',icon:Bell,href:'#'},{name:'Settings',icon:Settings,href:'#'}];
 
 const STATUS_S={active:'bg-emerald-50 text-emerald-700 border-emerald-200',inactive:'bg-[var(--surface-2)] text-[var(--text-muted)] border-[var(--border)]',suspended:'bg-red-50 text-red-600 border-red-200',pending:'bg-amber-50 text-amber-600 border-amber-200'};
@@ -23,7 +24,12 @@ const USERS=[
 const PAGE_SIZE=8;
 
 function Sidebar({open,onClose}){
-  const b=(<div className="flex flex-col h-full sidebar-dark w-64 p-5"><a href="/" className="inline-flex items-center gap-2 mb-10 pl-1"><div className="w-8 h-8 rounded bg-teal-600 text-white flex items-center justify-center font-bold text-base shadow-sm">A</div><span className="font-semibold text-xl tracking-tight text-[var(--text)]">A-Quire</span></a><nav className="space-y-1 flex-1">{NAV.map(({name,icon:Icon,href,active})=>(<a key={name} href={href} className={`sidebar-nav-item ${active?'bg-[var(--sidebar-hover)]':''}`}><Icon className="w-4 h-4 shrink-0"/>{name}</a>))}</nav><div className="pt-5 border-t border-[var(--sidebar-border)]"><div className="flex items-center gap-2.5 px-2"><div className="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-xs font-bold text-white">SA</div><div><p className="text-xs font-semibold text-[var(--text)]">Super Admin</p><p className="text-[10px] text-[var(--sidebar-text)]">admin@aquire.io</p></div></div></div></div>);
+  const navigate = useNavigate();
+  const handleLogout = () => {
+    api.logout();
+    navigate('/login');
+  };
+  const b=(<div className="flex flex-col h-full sidebar-dark w-64 p-5"><a href="/" className="inline-flex items-center gap-2 mb-10 pl-1"><div className="w-8 h-8 rounded bg-teal-600 text-white flex items-center justify-center font-bold text-base shadow-sm">A</div><span className="font-semibold text-xl tracking-tight text-[var(--text)]">A-Quire</span></a><nav className="space-y-1 flex-1">{NAV.map(({name,icon:Icon,href,active})=>(<a key={name} href={href} className={`sidebar-nav-item ${active?'bg-[var(--sidebar-hover)]':''}`}><Icon className="w-4 h-4 shrink-0"/>{name}</a>))}</nav><div className="pt-5 border-t border-[var(--sidebar-border)] space-y-2"><div className="flex items-center gap-2.5 px-2 mb-4"><div className="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-xs font-bold text-white">SA</div><div><p className="text-xs font-semibold text-[var(--text)]">Super Admin</p><p className="text-[10px] text-[var(--sidebar-text)]">admin@aquire.io</p></div></div><button onClick={handleLogout} className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-red-400 hover:text-red-300 hover:bg-red-900/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><LogOut className="w-4 h-4 shrink-0" /><span className="truncate">Logout</span></button></div></div>);
   return(<><div className="hidden lg:flex h-screen sticky top-0 shrink-0">{b}</div><div className={`lg:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${open?'opacity-100 pointer-events-auto':'opacity-0 pointer-events-none'}`} onClick={onClose}><div className={`fixed inset-y-0 left-0 shadow-2xl transition-transform duration-300 ${open?'translate-x-0':'-translate-x-full'}`} onClick={e=>e.stopPropagation()}><div className="relative h-full">{b}<button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--sidebar-hover)]"><X className="w-4 h-4"/></button></div></div></div></> );
 }
 

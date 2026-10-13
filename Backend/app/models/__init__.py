@@ -21,6 +21,7 @@ from app.models.student_note import StudentNote
 from app.models.assessment import Topic, Question, LearnerAbility, QuizSession, QuizResponse
 from app.models.analytics import LearnerStateLog
 from app.models.metrics import SystemMetrics, FeatureFlag
+from app.models.admin_models import Institution, Invoice, ModerationReport, AuditLog
 
 __all__ = [
     "User",
@@ -41,4 +42,8 @@ __all__ = [
     "LearnerStateLog",
     "SystemMetrics",
     "FeatureFlag",
+    "Institution",
+    "Invoice",
+    "ModerationReport",
+    "AuditLog",
 ]

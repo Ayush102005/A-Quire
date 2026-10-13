@@ -169,3 +169,27 @@ async def update_my_note(
 
     await db.flush()
     return note
+
+from pydantic import BaseModel
+from app.models.admin_models import ModerationReport
+
+class ReportCreate(BaseModel):
+    report_type: str
+    course_context: str
+    severity: str = "medium"
+
+@router.post("/report", summary="Submit a moderation report")
+async def submit_report(
+    data: ReportCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    report = ModerationReport(
+        report_type=data.report_type,
+        course_context=data.course_context,
+        reporter=current_user.email,
+        severity=data.severity
+    )
+    db.add(report)
+    await db.commit()
+    return {"status": "success", "message": "Report submitted."}

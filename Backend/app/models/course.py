@@ -16,6 +16,7 @@ from app.db.session import Base
 
 if TYPE_CHECKING:
     from app.models.enrollment import Enrollment
+    from app.models.admin_models import Institution
     from app.models.module import Module
     from app.models.student import User
 
@@ -24,6 +25,10 @@ class Course(Base):
     __tablename__ = "courses"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    institution_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("institutions.id", ondelete="CASCADE"), nullable=True, index=True
+    )
 
     instructor_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"),
@@ -48,6 +53,9 @@ class Course(Base):
     )
 
     # ── Relationships ───────────────────────────────────────────────────────
+    institution: Mapped["Institution"] = relationship(
+        "Institution", back_populates="courses", lazy="select",
+    )
     instructor: Mapped[User | None] = relationship(
         "User", back_populates="taught_courses",
         foreign_keys=[instructor_id], lazy="select",

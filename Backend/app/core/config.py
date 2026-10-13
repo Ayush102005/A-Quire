@@ -112,7 +112,7 @@ class Settings(BaseSettings):
     # ── Anthropic API (AI Mentor hints + AMATTA question generation) ──────────
     ANTHROPIC_API_KEY: Optional[str] = None
     ANTHROPIC_WORKSPACE_ID: Optional[str] = None
-    ANTHROPIC_MODEL_ID: str = "claude-sonnet-5"
+    ANTHROPIC_MODEL_ID: str = "claude-sonnet-5.5"
 
     # ── AWS Polly (Text-to-Speech) ──────────────────────────────────────────
     AWS_ACCESS_KEY_ID: Optional[str] = None

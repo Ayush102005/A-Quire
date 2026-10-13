@@ -1,7 +1,8 @@
 import React,{useState}from'react';
-import{Home,Users,BookOpen,BarChart2,Settings,Bell,Menu,X,CreditCard,Building,AlertTriangle,CheckCircle2,ChevronRight,Download,Plus,Edit2,Shield,Loader2,ChevronDown,Mail,Phone,Globe}from'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import{Home,Users,BookOpen,BarChart2,Settings,Bell,Menu,X,CreditCard,Building,AlertTriangle,CheckCircle2,ChevronRight,Download,Plus,Edit2,Shield,Loader2,ChevronDown,Mail,Phone,Globe,LogOut}from'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
-
+import { api } from '../services/api';
 const NAV=[{name:'Dashboard',icon:Home,href:'/admin'},{name:'Users',icon:Users,href:'/users'},{name:'Courses',icon:BookOpen,href:'#'},{name:'Analytics',icon:BarChart2,href:'#'},{name:'Billing',icon:CreditCard,href:'/billing',active:true},{name:'Settings',icon:Settings,href:'#'}];
 
 const INVOICES=[
@@ -22,6 +23,11 @@ const USAGE=[
 const STATUS_S={paid:'bg-emerald-50 text-emerald-700 border-emerald-200',overdue:'bg-red-50 text-red-600 border-red-200',pending:'bg-amber-50 text-amber-700 border-amber-200'};
 
 function Sidebar({open,onClose}){
+  const navigate = useNavigate();
+  const handleLogout = () => {
+    api.logout();
+    navigate('/login');
+  };
   const b=(
     <div className="flex flex-col h-full sidebar-dark w-64 p-5">
       <a href="/" className="inline-flex items-center gap-2 mb-10 pl-1">
@@ -35,14 +41,18 @@ function Sidebar({open,onClose}){
           </a>
         ))}
       </nav>
-      <div className="pt-5 border-t border-[var(--sidebar-border)]">
-        <div className="flex items-center gap-2.5 px-2">
+      <div className="pt-5 border-t border-[var(--sidebar-border)] space-y-2">
+        <div className="flex items-center gap-2.5 px-2 mb-4">
           <div className="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-xs font-bold text-white">SA</div>
           <div>
             <p className="text-xs font-semibold text-[var(--text)]">Super Admin</p>
             <p className="text-[10px] text-[var(--sidebar-text)]">admin@aquire.io</p>
           </div>
         </div>
+        <button onClick={handleLogout} className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-red-400 hover:text-red-300 hover:bg-red-900/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
+          <LogOut className="w-4 h-4 shrink-0" />
+          <span className="truncate">Logout</span>
+        </button>
       </div>
     </div>
   );

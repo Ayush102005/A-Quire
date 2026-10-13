@@ -12,6 +12,8 @@ import { LoadingState, ErrorState } from '../components/UXStates';
 import { useGaze } from '../contexts/GazeProvider';
 import GazeStatusPill from '../components/GazeStatusPill';
 import LiveCameraPreview from '../components/lesson/LiveCameraPreview';
+import FocusModeHUD from '../components/lesson/FocusModeHUD';
+import { Zap } from 'lucide-react';
 import { TrackingState, AttentionState } from '../utils/gazeState';
 import './LessonPlayer.css';
 
@@ -86,6 +88,105 @@ export default function LessonPlayer() {
   // False for manual "Ask mentor" requests — controls which context banner
   // is shown in MentorPanel (amber "stuck" vs neutral "here to help").
   const [isAutoDetected, setIsAutoDetected] = useState(false);
+  const [transcriptLang, setTranscriptLang] = useState('original');
+  const [translatedTranscript, setTranslatedTranscript] = useState(null);
+  
+  const [isTranslating, setIsTranslating] = useState(false);
+
+  // Audio Mode Check-in State (Default: 10 minutes for production)
+  const AUDIO_CHECKIN_INTERVAL_MS = 10 * 60 * 1000;
+  const [isAudioMode, setIsAudioMode] = useState(false);
+  const [checkinData, setCheckinData] = useState(null);
+  const audioModeIntervalRef = useRef(null);
+
+  // Focus Mode State
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const [focusDrawerType, setFocusDrawerType] = useState(null); // null | 'mentor' | 'notes'
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const tag = e.target?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || e.target?.isContentEditable) {
+        return;
+      }
+      if (e.key === 'f' || e.key === 'F') {
+        setIsFocusMode((prev) => !prev);
+      } else if (e.key === 'Escape' && isFocusMode) {
+        if (focusDrawerType) {
+          setFocusDrawerType(null);
+        } else {
+          setIsFocusMode(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFocusMode, focusDrawerType]);
+
+  useEffect(() => {
+    if (isAudioMode && isPlaying && trackingState === TrackingState.TRACKING_ACTIVE) {
+      if (!audioModeIntervalRef.current) {
+        audioModeIntervalRef.current = setInterval(() => {
+          triggerAudioCheckin();
+        }, AUDIO_CHECKIN_INTERVAL_MS);
+      }
+    } else {
+      if (audioModeIntervalRef.current) {
+        clearInterval(audioModeIntervalRef.current);
+        audioModeIntervalRef.current = null;
+      }
+    }
+    return () => {
+      if (audioModeIntervalRef.current) {
+        clearInterval(audioModeIntervalRef.current);
+        audioModeIntervalRef.current = null;
+      }
+    };
+  }, [isAudioMode, isPlaying, trackingState]);
+
+  const triggerAudioCheckin = async () => {
+    setIsPlaying(false);
+    setCheckinData({ loading: true, question: null, isCorrect: null, feedback: null, answer: '' });
+    try {
+      const res = await api.post('/mentor/audio-checkin/generate', {
+        lesson_id: lessonId,
+        current_timestamp_ms: currentTimeRef.current * 1000,
+        window_size_ms: 180000 
+      });
+      setCheckinData({ loading: false, question: res.data.question, isCorrect: null, feedback: null, answer: '' });
+    } catch (e) {
+      console.error(e);
+      setCheckinData(null);
+      setIsPlaying(true);
+    }
+  };
+
+  const submitAudioCheckin = async () => {
+    if (!checkinData?.answer) return;
+    setCheckinData(prev => ({ ...prev, loading: true }));
+    try {
+      const res = await api.post('/mentor/audio-checkin/verify', {
+        question: checkinData.question,
+        answer: checkinData.answer
+      });
+      setCheckinData(prev => ({
+        ...prev,
+        loading: false,
+        isCorrect: res.data.is_correct,
+        feedback: res.data.feedback
+      }));
+      if (res.data.is_correct) {
+        setTimeout(() => {
+          setCheckinData(null);
+          setIsPlaying(true);
+        }, 3000);
+      }
+    } catch (e) {
+      console.error(e);
+      setCheckinData(prev => ({ ...prev, loading: false }));
+    }
+  };
+
 
   // Refs — mutable values that don't trigger re-renders
   const pauseCountRef = useRef(0);
@@ -150,9 +251,12 @@ export default function LessonPlayer() {
     };
   }, []);
 
+  
   // Gaze-plus-behavior combination rule
   useEffect(() => {
+    if (isAudioMode) return;
     if (trackingState !== TrackingState.TRACKING_ACTIVE) {
+
       currentOffLessonStartMs.current = null;
       isGazeStruggleFiredForCurrentEpisode.current = false;
       isFixationStruggleFiredForCurrentEpisode.current = false;
@@ -404,10 +508,10 @@ export default function LessonPlayer() {
   const buildTranscriptContext = (segments, currentTimeSecs) => {
     if (!segments?.length) return null;
     const idx = Math.max(0, findTranscriptSegmentIndex(segments, currentTimeSecs));
-    const start = Math.max(0, idx - 2);
-    const end   = Math.min(segments.length - 1, idx + 2);
+    const start = Math.max(0, idx - 10);
+    const end   = Math.min(segments.length - 1, idx + 10);
     const text  = segments.slice(start, end + 1).map(s => s.text).join(' ').trim();
-    return text ? text.slice(0, 1800) : null; // cap to notes field limit
+    return text ? text.slice(0, 6000) : null; // cap to notes field limit
   };
 
   detectStruggleRef.current = async ({
@@ -443,21 +547,21 @@ export default function LessonPlayer() {
     try {
       const result = await api.struggles.monitor({
         student_id: user.id,
-        lesson_id: lessonId,
-        course_id: lessonRef.current?.course_id ?? courseId ?? null,
+        lesson_id: parseInt(lessonId, 10),
+        course_id: parseInt(lessonRef.current?.course_id || courseId || 1, 10),
         rewatch_count: rewatchCount ?? rewatchCountRef.current,
         pause_count: pauseCount ?? pauseCountRef.current,
         idle_seconds: idleSeconds,
         completion_percent: 0,
         failed_attempts: 0,
-        lesson_timestamp_ms: currentTimeRef.current * 1000,
+        lesson_timestamp_ms: Math.round(currentTimeRef.current * 1000),
         struggle_score: struggleScore,
         manual_trigger: isManual,
-        inactivity_duration_ms: (idleSeconds * 1000),
-        fixation_duration_ms: fixationMs,
-        gaze_off_screen_ms: inactivityMs,
+        inactivity_duration_ms: Math.round(idleSeconds * 1000),
+        fixation_duration_ms: Math.round(fixationMs),
+        gaze_off_screen_ms: Math.round(inactivityMs),
         transcript_window_id: activeSegId,
-        notes: transcriptContext ? `Transcript context: ${transcriptContext}` : null,
+        notes: transcriptContext ? `Transcript context: ${transcriptContext}`.substring(0, 1950) : null,
         client_event_id: `lesson-${lessonId}-${Date.now()}`,
       });
       if (result?.detected && result?.event_id) {
@@ -562,8 +666,24 @@ export default function LessonPlayer() {
     }
   }, []);
 
-
-
+  useEffect(() => {
+    if (transcriptLang === 'original') {
+      setTranslatedTranscript(null);
+      return;
+    }
+    const fetchTranslated = async () => {
+      setIsTranslating(true);
+      try {
+        const trans = await api.lessons.fetchTranslatedTranscript(lessonId, transcriptLang);
+        setTranslatedTranscript(trans);
+      } catch (err) {
+        console.error("Failed to fetch translated transcript", err);
+      } finally {
+        setIsTranslating(false);
+      }
+    };
+    fetchTranslated();
+  }, [lessonId, transcriptLang]);
   const handleMarkComplete = useCallback(async () => {
     if (!lessonId) return;
     try {
@@ -609,7 +729,7 @@ export default function LessonPlayer() {
   const totalTime = totalSeconds > 0 ? `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}` : '--:--';
 
   const chapters = lesson?.chapters ?? [];
-  const transcriptItems = lesson?.transcript || lesson?.transcript_items || [];
+  const transcriptItems = translatedTranscript || lesson?.transcript || lesson?.transcript_items || [];
   const resources = lesson?.resources || lesson?.links || [];
   const questions = lesson?.questions || lesson?.in_lesson_questions || [];
 
@@ -735,6 +855,16 @@ export default function LessonPlayer() {
           detectStruggleRef.current?.({ isManual: false, idleSeconds: 0, rewatchCount: firedRewatchCount });
         }
       }
+      
+      // If the user scrubbed the video by more than 3 seconds (forward or backward),
+      // they are at a new part of the lesson. Clear any active struggle event so that
+      // if they click "Ask Mentor", it generates fresh context for this new timestamp
+      // rather than reusing context from a previous auto-detected struggle.
+      if (Math.abs(currentTimeRef.current - newTime) > 3) {
+        setStruggleEventId(null);
+        struggleEventIdRef.current = null;
+      }
+      
       currentTimeRef.current = newTime;
       setProgress(prev => ({ ...prev, watched_seconds: newTime }));
     }
@@ -756,6 +886,11 @@ export default function LessonPlayer() {
       inactivityTimerRef.current = null;
     }
     idleStartRef.current = null;
+    
+    // Clear the active struggle event when they resume playing,
+    // so any future "Ask Mentor" gets fresh context for the new timestamp.
+    setStruggleEventId(null);
+    struggleEventIdRef.current = null;
   }, []);
 
   const handlePause = useCallback(() => {
@@ -887,7 +1022,83 @@ export default function LessonPlayer() {
   }
 
   return (
-      <div className="lesson-player" data-theme={theme}>
+    <div className={`lesson-player ${isFocusMode ? 'lesson-player--focus' : ''} ${isFocusMode && focusDrawerType ? 'drawer-open' : ''}`} data-theme={theme}>
+      {isFocusMode && (
+        <FocusModeHUD
+          lessonTitle={displayLesson.title}
+          attentionState={attentionState}
+          isTrackingEnabled={isTrackingEnabled}
+          activeDrawer={focusDrawerType}
+          theme={theme}
+          onExitFocusMode={() => {
+            setIsFocusMode(false);
+            setFocusDrawerType(null);
+          }}
+          onOpenMentor={() => setFocusDrawerType((prev) => (prev === 'mentor' ? null : 'mentor'))}
+          onOpenNotes={() => setFocusDrawerType((prev) => (prev === 'notes' ? null : 'notes'))}
+        />
+      )}
+
+      {/* Focus Mode Slide-Over Drawer for Mentor / Notes */}
+      {isFocusMode && focusDrawerType && (
+        <div 
+          id="focus-mode-drawer"
+          data-testid="focus-mode-drawer"
+          className="focus-mode-drawer"
+        >
+          <div 
+            id="focus-mode-drawer-header"
+            data-testid="focus-mode-drawer-header"
+            className="flex items-center justify-between px-4 py-3 border-b border-stone-800 text-stone-200 shrink-0 bg-stone-950/70"
+          >
+            <span id="focus-mode-drawer-title" data-testid="focus-mode-drawer-title" className="font-semibold text-sm flex items-center gap-2 text-stone-100">
+              {focusDrawerType === 'mentor' ? '🤖 AI Mentor' : '📝 Personal Notes'}
+            </span>
+            <button
+              id="focus-mode-drawer-close-btn"
+              data-testid="focus-mode-drawer-close-btn"
+              onClick={() => setFocusDrawerType(null)}
+              className="p-1.5 text-stone-400 hover:text-white rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
+              aria-label="Close drawer"
+              title="Close drawer (Esc)"
+            >
+              ✕
+            </button>
+          </div>
+          <div 
+            id="focus-mode-drawer-content"
+            data-testid="focus-mode-drawer-content"
+            className="flex-1 min-h-0 flex flex-col overflow-hidden"
+          >
+            {focusDrawerType === 'mentor' ? (
+              <MentorPanel
+                id="focus-mentor-panel"
+                isDrawer={true}
+                isOpen={true}
+                isStruggle={showOverlay}
+                isAutoDetected={isAutoDetected}
+                reasonText={struggleReasonText}
+                hints={hints}
+                hintLoading={hintLoading}
+                onGetHint={onGetHint}
+                onClose={() => setFocusDrawerType(null)}
+                onExpand={() => {}}
+                onUnderstood={() => setShowOverlay(false)}
+              />
+            ) : (
+              <div className="drawer-notes-wrapper">
+                <PersonalNotesPanel 
+                  id="focus-notes-panel"
+                  textareaId="focus-notes-textarea"
+                  lessonId={lessonId} 
+                  className="flex-1 min-h-0" 
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="lesson-player__header flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div className="lesson-player__header-left flex items-start gap-4">
           <button className="button button--text button--back shrink-0 mt-1" onClick={() => navigate(-1)} type="button" aria-label="Go back">
@@ -907,6 +1118,20 @@ export default function LessonPlayer() {
         </div>
 
         <div className="lesson-player__actions flex flex-wrap items-center gap-2 sm:gap-3">
+          <button
+            id="focus-mode-toggle-btn"
+            data-testid="focus-mode-toggle-btn"
+            className="px-3.5 py-2 bg-gradient-to-r from-indigo-500/15 to-purple-500/15 hover:from-indigo-500/25 hover:to-purple-500/25 border border-indigo-500/30 text-indigo-700 dark:text-indigo-300 font-semibold rounded-xl transition-all flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none shadow-sm cursor-pointer"
+            type="button"
+            onClick={() => setIsFocusMode(true)}
+            title="Enter Focus Mode (Press F)"
+            aria-label="Enter Focus Mode"
+          >
+            <Zap className="w-4 h-4 text-indigo-600 dark:text-indigo-400 animate-pulse" />
+            <span>Focus Mode</span>
+            <kbd className="hidden md:inline-block ml-1 px-1.5 py-0.5 text-[10px] bg-indigo-500/20 rounded text-indigo-700 dark:text-indigo-300 font-mono">F</kbd>
+          </button>
+
           <GazeStatusPill 
             trackingState={trackingState}
             attentionState={attentionState}
@@ -973,13 +1198,15 @@ export default function LessonPlayer() {
               />
             </div>
             
-            {/* Visual Progression Bar beneath video */}
+            {/* Visual Progression Bar beneath video — hidden in focus mode */}
+          {!isFocusMode && (
             <div className="w-full h-1.5 bg-stone-200 dark:bg-stone-800 overflow-hidden shrink-0">
               <div 
                 className="h-full bg-[var(--primary)] transition-[width] duration-300 ease-out" 
                 style={{ width: `${Math.max(0, Math.min(100, lessonProgress || 0))}%` }} 
               />
             </div>
+          )}
           </section>
 
           {/* Mobile Camera Preview */}
@@ -1017,7 +1244,8 @@ export default function LessonPlayer() {
             </div>
           )}
 
-          {/* Learning Tabs */}
+          {/* Learning Tabs — hidden in focus mode */}
+          {!isFocusMode && (
           <section className="learning-tabs hidden sm:flex flex-col tabs-container">
             <div className="learning-tabs__header">
               <button 
@@ -1047,6 +1275,9 @@ export default function LessonPlayer() {
                     segments={transcriptItems} 
                     currentTime={progress?.watched_seconds || 0} 
                     onSeek={handleSeek} 
+                    lang={transcriptLang}
+                    onLangChange={setTranscriptLang}
+                    isLoading={isTranslating}
                   />
                 </div>
               )}
@@ -1064,8 +1295,10 @@ export default function LessonPlayer() {
               )}
             </div>
           </section>
+          )}
 
-          {/* Mobile Tab Content (conditionally shown) */}
+          {/* Mobile Tab Content — hidden in focus mode */}
+          {!isFocusMode && (
           <section className="learning-tabs flex sm:hidden flex-col mt-4 tabs-container">
             <div className="learning-tabs__content p-4 h-[400px] active-content">
               {activeTab === 'transcript' && (
@@ -1074,6 +1307,9 @@ export default function LessonPlayer() {
                     segments={transcriptItems}
                     currentTime={progress?.watched_seconds || 0}
                     onSeek={handleSeek}
+                    lang={transcriptLang}
+                    onLangChange={setTranscriptLang}
+                    isLoading={isTranslating}
                   />
                 </div>
               )}
@@ -1110,8 +1346,10 @@ export default function LessonPlayer() {
               )}
             </div>
           </section>
+          )}
         </main>
 
+        {!isFocusMode && (
         <aside className="lesson-player__sidebar hidden sm:block flex-col gap-4">
           {wsStatus === 'disconnected' && (
             <div className="bg-red-50 text-red-700 p-3 rounded-xl mb-4 text-sm font-medium flex items-center justify-between border border-red-100">
@@ -1138,7 +1376,25 @@ export default function LessonPlayer() {
             />
           </div>
 
+
+          {/* Audio Mode Toggle */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-gray-800 text-sm">Audio / Note-Taking Mode</h3>
+              <button 
+                onClick={() => setIsAudioMode(!isAudioMode)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 ${isAudioMode ? 'bg-indigo-600' : 'bg-gray-200'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isAudioMode ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+            <p className="text-xs text-gray-500">
+              When enabled, gaze tracking is relaxed. You will receive periodic AI check-ins to verify engagement while taking notes.
+            </p>
+          </div>
+          
           {/* Desktop Camera Preview */}
+
           <div className="mb-4">
             <LiveCameraPreview
               stream={stream}
@@ -1160,9 +1416,90 @@ export default function LessonPlayer() {
           </div>
 
         </aside>
+        )}
       </div>
 
+      
+      {/* Audio Checkin Modal */}
+      {checkinData && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+                🎧 Audio Check-In
+              </h3>
+              <p className="text-sm text-gray-600 mb-6">
+                You are in Audio / Note-Taking Mode. Answer this quick question to prove you're still listening!
+              </p>
+              
+              {checkinData.loading && !checkinData.question ? (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+                  <p className="text-sm text-gray-500">Generating question from the last 3 minutes...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-indigo-50 text-indigo-900 p-4 rounded-lg font-medium mb-4">
+                    {checkinData.question}
+                  </div>
+                  
+                  <input
+                    type="text"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-4"
+                    placeholder="Your answer..."
+                    value={checkinData.answer}
+                    onChange={(e) => setCheckinData(prev => ({ ...prev, answer: e.target.value }))}
+                    disabled={checkinData.loading || checkinData.isCorrect === true}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && checkinData.answer.trim()) {
+                        submitAudioCheckin();
+                      }
+                    }}
+                  />
+                  
+                  {checkinData.feedback && (
+                    <div className={`p-3 rounded-lg text-sm mb-4 flex items-start gap-2 ${checkinData.isCorrect ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+                      <span>{checkinData.isCorrect ? '✅' : '❌'}</span>
+                      <span>{checkinData.feedback}</span>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-end gap-3 mt-2">
+                    {checkinData.isCorrect === false && (
+                      <button 
+                        onClick={() => {
+                          setCheckinData(null);
+                          setIsPlaying(true);
+                        }}
+                        className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+                      >
+                        Skip & Resume
+                      </button>
+                    )}
+                    
+                    {!checkinData.isCorrect && (
+                      <button
+                        onClick={submitAudioCheckin}
+                        disabled={!checkinData.answer?.trim() || checkinData.loading}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {checkinData.loading && checkinData.question ? (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : null}
+                        Submit Answer
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {!isFocusMode && (
       <div className="lesson-player__mobile-bar sm:hidden">
+
         <button 
           type="button" 
           className={`button ${activeTab === 'transcript' ? 'button--primary' : 'button--muted'} button--full`} 
@@ -1191,6 +1528,7 @@ export default function LessonPlayer() {
           Notes
         </button>
       </div>
+      )}
     </div>
   );
 }

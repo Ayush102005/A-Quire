@@ -52,6 +52,10 @@ interface RunResult {
   status: 'SUCCESS' | 'WRONG_ANSWER' | 'ERROR' | 'LANGUAGE_NOT_SUPPORTED' | 'NO_TEST_CASES';
   output: string;
   test_results: TestResult[];
+  // Free-run (execute) mode fields — present when running lesson-authored problems
+  stdout?: string;
+  stderr?: string;
+  isExecuteMode?: boolean;
 }
 
 interface SubmitResult {
@@ -371,6 +375,9 @@ export default function DsaProblemPage() {
   
   const [language, setLanguage] = useState(LANGUAGES[2].id); // python by default
   const [code, setCode] = useState('');
+  // Custom stdin for lesson-authored problems in execute (free-run) mode.
+  // Pre-filled from the first example when a lesson problem loads.
+  const [customInput, setCustomInput] = useState('');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -716,6 +723,7 @@ export default function DsaProblemPage() {
           test_cases: [],
         });
         setCode('');
+        setCustomInput('');
         setIsJudgeAvailable(false);
       } catch (err: any) {
         setError(err.message || 'Failed to load problem');
@@ -727,15 +735,30 @@ export default function DsaProblemPage() {
   }, [id, language]);
 
   const handleRun = async () => {
-    if (!problem || !isJudgeAvailable) return;
+    if (!problem) return;
     try {
       setIsRunning(true);
       setActiveTab('results');     // auto-switch to Test Results
       setSubmitResult(null);       // clear old submit verdict
       setRunResult(null);
       setActiveCase(0);            // reset to first case
-      const res = await api.problems.run(problem.id, code, language);
-      setRunResult(res);
+
+      if (isJudgeAvailable) {
+        // Bank-linked problem: judge against structured test cases
+        const res = await api.problems.run(problem.id, code, language);
+        setRunResult(res);
+      } else {
+        // Lesson-authored problem: free-run with custom stdin
+        const res = await api.problems.execute(code, language, customInput);
+        setRunResult({
+          status: res.status,
+          output: res.stderr || res.stdout || '(no output)',
+          test_results: [],
+          stdout: res.stdout,
+          stderr: res.stderr,
+          isExecuteMode: true,
+        });
+      }
     } catch (err: any) {
       setRunResult({ status: 'ERROR', output: err.message, test_results: [] });
     } finally {
@@ -868,8 +891,7 @@ export default function DsaProblemPage() {
             <div className="flex gap-2">
               <button
                 onClick={handleRun}
-                disabled={isRunning || isSubmitting || !isJudgeAvailable}
-                title={isJudgeAvailable ? undefined : 'This problem has no runnable test cases.'}
+                disabled={isRunning || isSubmitting}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium bg-[#3c3c3c] text-stone-200 hover:bg-[#4d4d4d] disabled:opacity-50 transition-colors"
               >
                 {isRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
@@ -998,7 +1020,20 @@ export default function DsaProblemPage() {
                       )}
                     </>
                   ) : (
-                    <p className="text-stone-500 italic text-sm">No sample test cases available for this problem.</p>
+                    /* Lesson-authored problem: editable stdin for free-run mode */
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-stone-500 text-xs mb-1">Custom Input (stdin)</p>
+                        <textarea
+                          value={customInput}
+                          onChange={e => setCustomInput(e.target.value)}
+                          rows={4}
+                          placeholder="Enter input for your program here..."
+                          className="w-full bg-[#2d2d2d] border border-[#3c3c3c] rounded p-3 text-stone-200 text-sm font-mono resize-none outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/30 transition-all"
+                        />
+                      </div>
+                      <p className="text-stone-600 text-xs italic">Type your input above and click Run Code to see the output.</p>
+                    </div>
                   )}
                 </div>
               )}
@@ -1010,9 +1045,31 @@ export default function DsaProblemPage() {
                   {/* Empty state */}
                   {!runResult && !submitResult && (
                     <p className="text-stone-500 italic text-sm">
-                      Click <span className="text-stone-200 font-semibold">Run</span> to test against sample cases, or{' '}
-                      <span className="text-teal-400 font-semibold">Submit</span> to judge against all test cases.
+                      Click <span className="text-stone-200 font-semibold">Run</span> to test your code
+                      {isJudgeAvailable ? ', or ' : '. '}
+                      {isJudgeAvailable && <><span className="text-teal-400 font-semibold">Submit</span> to judge against all test cases.</>}
                     </p>
+                  )}
+
+                  {/* Execute mode: raw stdout/stderr for lesson problems */}
+                  {runResult?.isExecuteMode && (
+                    <div className="space-y-3">
+                      {runResult.stdout && (
+                        <div>
+                          <p className="text-stone-500 text-xs mb-1 uppercase tracking-wider">Output</p>
+                          <pre className="bg-[#2d2d2d] border border-[#3c3c3c] rounded p-3 text-stone-200 whitespace-pre-wrap text-xs font-mono">{runResult.stdout}</pre>
+                        </div>
+                      )}
+                      {runResult.stderr && (
+                        <div>
+                          <p className="text-rose-500 text-xs mb-1 uppercase tracking-wider">Error</p>
+                          <pre className="bg-rose-500/10 border border-rose-500/30 rounded p-3 text-rose-300 whitespace-pre-wrap text-xs font-mono">{runResult.stderr}</pre>
+                        </div>
+                      )}
+                      {!runResult.stdout && !runResult.stderr && (
+                        <p className="text-stone-500 italic text-sm">Program produced no output.</p>
+                      )}
+                    </div>
                   )}
 
                   {/* Run results — per-case actual vs expected */}

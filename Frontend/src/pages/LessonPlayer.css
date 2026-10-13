@@ -248,3 +248,283 @@
   padding: 12px 16px 0;
   scrollbar-width: none;
 }
+
+/* ── Focus Mode (Immersive Theater) ────────────────────────── */
+.lesson-player--focus {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 99 !important;
+  background: var(--bg) !important;
+  color: var(--text) !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* When drawer is open, the main layout shifts left */
+.lesson-player--focus.drawer-open .lesson-player__layout {
+  padding-right: 440px !important;
+}
+
+.lesson-player--focus .lesson-player__header {
+  display: none !important;
+}
+
+.lesson-player--focus .lesson-player__layout {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 100% !important;
+  padding: 72px 24px 24px !important;
+  gap: 0 !important;
+  transition: padding-right 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.lesson-player--focus .lesson-player__sidebar {
+  display: none !important;
+}
+
+.lesson-player--focus .lesson-player__main {
+  width: 100% !important;
+  max-width: 1200px !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
+.lesson-player--focus .video-card {
+  width: 100% !important;
+  max-height: calc(100vh - 110px) !important;
+  aspect-ratio: 16 / 9 !important;
+  border-radius: 24px !important;
+  box-shadow: var(--shadow-lg) !important;
+  border: 1px solid var(--border) !important;
+  overflow: hidden !important;
+}
+
+/* ─── HUD — theme-aware ──────────────────────────────────────── */
+.focus-mode-hud {
+  background: var(--surface) !important;
+  border-bottom: 1px solid var(--border) !important;
+  color: var(--text) !important;
+}
+
+.lesson-player--focus .learning-tabs {
+  display: none !important;
+}
+
+.lesson-player--focus .video-card__frame {
+  height: 100% !important;
+  max-height: calc(100vh - 120px) !important;
+}
+
+/* ─── Focus Mode Slide-Over Drawer — theme-aware ────────────── */
+.focus-mode-drawer {
+  position: fixed !important;
+  top: 56px !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  height: calc(100vh - 56px) !important;
+  width: 420px !important;
+  max-width: 90vw !important;
+  background: var(--surface) !important;
+  border-left: 1px solid var(--border) !important;
+  z-index: 110 !important;
+  box-shadow: var(--shadow-lg) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  animation: slideInRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) both !important;
+  color: var(--text) !important;
+}
+
+/* Drawer title bar */
+.focus-mode-drawer #focus-mode-drawer-header {
+  height: 52px !important;
+  min-height: 52px !important;
+  flex-shrink: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 16px !important;
+  border-bottom: 1px solid var(--border) !important;
+  background: var(--surface-soft) !important;
+  color: var(--text) !important;
+}
+
+.focus-mode-drawer #focus-mode-drawer-title {
+  color: var(--text) !important;
+}
+
+.focus-mode-drawer #focus-mode-drawer-close-btn {
+  color: var(--muted) !important;
+}
+
+.focus-mode-drawer #focus-mode-drawer-close-btn:hover {
+  color: var(--text) !important;
+  background: var(--surface-soft) !important;
+}
+
+/* Scrollable body — fills all remaining height */
+.focus-mode-drawer #focus-mode-drawer-content {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  background: var(--bg) !important;
+}
+
+/* ─── Notes Panel in Drawer ─────────────────────────────────── */
+.focus-mode-drawer .drawer-notes-wrapper {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 16px !important;
+  gap: 8px !important;
+  overflow: hidden !important;
+  background: var(--bg) !important;
+}
+
+.focus-mode-drawer #focus-notes-panel {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+}
+
+.focus-mode-drawer #focus-notes-panel > div:first-child {
+  flex-shrink: 0 !important;
+  color: var(--muted) !important;
+}
+
+.focus-mode-drawer #focus-notes-panel > div:first-child span {
+  color: var(--muted) !important;
+}
+
+.focus-mode-drawer #focus-notes-textarea {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+  border-radius: 12px !important;
+  padding: 14px !important;
+  resize: none !important;
+  outline: none !important;
+  font-size: 0.875rem !important;
+  line-height: 1.65 !important;
+  font-family: inherit !important;
+  box-sizing: border-box !important;
+  transition: border-color 0.15s, box-shadow 0.15s !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--border) transparent !important;
+}
+
+.focus-mode-drawer #focus-notes-textarea::placeholder {
+  color: var(--muted) !important;
+}
+
+.focus-mode-drawer #focus-notes-textarea:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent) !important;
+}
+
+/* ─── Mentor Panel in Drawer ────────────────────────────────── */
+.focus-mode-drawer #focus-mentor-panel {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: hidden !important;
+}
+
+/* The aside element inside MentorPanel */
+.focus-mode-drawer aside {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: var(--bg) !important;
+  box-shadow: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  color: var(--text) !important;
+}
+
+.focus-mode-drawer aside > div:first-child {
+  background: var(--surface-soft) !important;
+  border-bottom-color: var(--border) !important;
+  color: var(--muted) !important;
+}
+
+/* Messages area — scrollable */
+.focus-mode-drawer #focus-mentor-panel-messages {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--border) transparent !important;
+  background: var(--bg) !important;
+}
+
+/* Cards inside messages — prevent overlap */
+.focus-mode-drawer #focus-mentor-panel-messages > div {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+
+/* Empty state card */
+.focus-mode-drawer #focus-mentor-panel-empty-card {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+}
+
+/* Footer/input bar */
+.focus-mode-drawer #focus-mentor-panel-input-container {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.focus-mode-drawer #focus-mentor-panel-input-container textarea {
+  color: var(--text) !important;
+}
+
+.focus-mode-drawer #focus-mentor-panel-input-container textarea::placeholder {
+  color: var(--muted) !important;
+}
+
+/* Generic scrollbar style for any textarea inside drawer */
+.focus-mode-drawer textarea {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+/* Slide in animation */
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+

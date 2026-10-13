@@ -9,13 +9,14 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Index, Integer, String, func, JSON
+from sqlalchemy import Boolean, DateTime, Index, Integer, String, func, JSON, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 
 if TYPE_CHECKING:
     from app.models.course import Course
+    from app.models.admin_models import Institution
     from app.models.enrollment import Enrollment
     from app.models.notification import Notification
     from app.models.progress import Progress
@@ -44,6 +45,11 @@ class User(Base):
         comment="bcrypt hash — only set for email+password users",
     )
 
+    # ── Identity ───────────────────────────────────────────────────────────
+    institution_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("institutions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    
     # ── Role & status ──────────────────────────────────────────────────────
     role: Mapped[str] = mapped_column(
         String(20), nullable=False, default="student", server_default="student",
@@ -87,6 +93,9 @@ class User(Base):
     )
 
     # ── Relationships ───────────────────────────────────────────────────────
+    institution: Mapped["Institution"] = relationship(
+        "Institution", back_populates="users", lazy="select",
+    )
     taught_courses: Mapped[list[Course]] = relationship(
         "Course", back_populates="instructor",
         foreign_keys="Course.instructor_id", lazy="select",

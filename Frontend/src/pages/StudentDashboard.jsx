@@ -4,7 +4,7 @@ import {
   Home, BookOpen, Video, BrainCircuit, LineChart, Bell, User, Settings,
   Search, Menu, X, PlayCircle, Clock, CheckCircle2,
   ChevronRight, AlertCircle, Sparkles, BookX, Target, Zap,
-  RefreshCw, TrendingUp, Code2,
+  RefreshCw, TrendingUp, Code2, Send,
 } from "lucide-react";
 import { api, getCurrentUser, getAccessToken, connectNotifications } from "../services/api";
 import ThemeToggle from "../components/ThemeToggle";
@@ -77,6 +77,33 @@ export default function StudentDashboard() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const user = getCurrentUser();
 
+  // AI Mentor Chat State
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatMessages, setChatMessages] = useState([
+    { role: 'assistant', text: 'Hello! I am your AI Mentor. I noticed you are currently reviewing lessons. How can I help you today?' }
+  ]);
+
+  const handleChatSubmit = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    
+    const userMessage = chatInput;
+    setChatInput('');
+    
+    // Add user message to UI immediately
+    const updatedHistory = [...chatMessages, { role: 'user', text: userMessage }];
+    setChatMessages(updatedHistory);
+    
+    try {
+      const response = await api.mentor.chat(userMessage, chatMessages);
+      setChatMessages(prev => [...prev, { role: 'assistant', text: response.reply }]);
+    } catch (err) {
+      console.error("Mentor chat failed", err);
+      setChatMessages(prev => [...prev, { role: 'assistant', text: "I'm sorry, I couldn't connect to the server right now. Please try again later." }]);
+    }
+  };
+
   const [continueLesson, setContinueLesson] = useState(null);
   const [stats, setStats] = useState(null);
   const [courses, setCourses] = useState(null);
@@ -125,7 +152,19 @@ export default function StudentDashboard() {
     // Struggles
     setLoadingStruggles(true);
     api.struggles.list()
-      .then(e => setStruggles((e ?? []).slice(0, 5)))
+      .then(e => {
+        const list = e ?? [];
+        const unique = [];
+        const seen = new Set();
+        for (const item of list) {
+          const key = item.title || item.lesson_id;
+          if (!seen.has(key)) {
+            seen.add(key);
+            unique.push(item);
+          }
+        }
+        setStruggles(unique.slice(0, 5));
+      })
       .catch(() => setStruggles([]))
       .finally(() => setLoadingStruggles(false));
   }, []);
@@ -184,7 +223,10 @@ export default function StudentDashboard() {
           </div>
         </div>
         <div className="flex flex-col sm:flex-row w-full md:w-auto gap-3 relative z-10 shrink-0">
-          <button className="px-6 py-3 bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] font-medium rounded-xl hover:bg-[var(--surface-2)] transition-colors shadow-sm flex items-center justify-center gap-2">
+          <button 
+            onClick={() => setIsChatOpen(true)}
+            className="px-6 py-3 bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] font-medium rounded-xl hover:bg-[var(--surface-2)] transition-colors shadow-sm flex items-center justify-center gap-2"
+          >
             <BrainCircuit className="w-5 h-5 text-teal-700" /> Consult AI Mentor
           </button>
           <Link to={cl.lesson_id ? lessonPath(cl.lesson_id, cl.course_id, cl.lesson_type) : "/courses"} className="px-6 py-3 bg-teal-700 text-white font-medium rounded-xl hover:bg-teal-800 transition-colors shadow-sm flex items-center justify-center gap-2">
@@ -396,15 +438,29 @@ export default function StudentDashboard() {
                     <p className="text-stone-300 text-sm mb-4 leading-relaxed">Concepts to revisit based on your struggle events.</p>
                     {loadingStruggles ? <Skeleton h="h-20" /> : struggles?.length ? (
                       <div className="space-y-3 relative z-10">
-                        {struggles.slice(0, 3).map((e, i) => (
+                        {struggles.slice(0, 3).map((e, i) => {
+                          let reviewPath = "/courses";
+                          if (e.problem_id) {
+                            if (e.context_type === 'dsa') {
+                              reviewPath = `/dsa/${e.problem_id}`;
+                            } else if (e.context_type === 'question') {
+                              reviewPath = `/question/${e.problem_id}`;
+                            } else {
+                              reviewPath = `/question/${e.problem_id}`; // fallback
+                            }
+                          } else if (e.lesson_id) {
+                            reviewPath = lessonPath(e.lesson_id, e.course_id, e.context_type);
+                          }
+                          return (
                           <div key={i} className="bg-stone-700/50 border border-stone-600 p-3 rounded-lg flex justify-between items-center hover:bg-stone-700 transition-colors">
                             <div>
-                              <h4 className="font-medium text-sm">{e.title || `Lesson #${e.lesson_id}`}</h4>
-                              <p className="text-xs text-stone-400 mt-0.5">Score: {e.struggle_score?.toFixed(1) ?? "—"}</p>
+                              <h4 className="font-medium text-sm">{e.title || (e.problem_id ? `Problem ${e.problem_id}` : `Lesson #${e.lesson_id}`)}</h4>
+                              <p className="text-xs text-stone-400 mt-0.5">Score: {e.severity?.toFixed(1) ?? "—"}</p>
                             </div>
-                            <Link to={lessonPath(e.lesson_id, e.course_id)} className="text-xs bg-[var(--card-bg)] text-[var(--text)] font-medium px-3 py-1.5 rounded hover:bg-teal-50 transition-colors shadow-sm">Review</Link>
+                            <Link to={reviewPath} className="text-xs bg-[var(--card-bg)] text-[var(--text)] font-medium px-3 py-1.5 rounded hover:bg-teal-50 transition-colors shadow-sm">Review</Link>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : <p className="text-stone-400 text-sm relative z-10">No struggle events recorded yet.</p>}
                   </section>
@@ -437,6 +493,48 @@ export default function StudentDashboard() {
           </div>
         </main>
       </div>
+
+      {/* AI Mentor Chat Interface */}
+      {isChatOpen && (
+        <div className="fixed bottom-6 right-6 w-96 h-[500px] bg-[var(--card-bg)] border border-[var(--border)] shadow-2xl rounded-2xl flex flex-col z-[9999] overflow-hidden animate-in slide-in-from-bottom-8">
+          <div className="flex items-center justify-between p-4 bg-teal-800 text-white">
+            <div className="flex items-center gap-2">
+              <BrainCircuit className="w-5 h-5" />
+              <h3 className="font-semibold">AI Mentor</h3>
+            </div>
+            <button onClick={() => setIsChatOpen(false)} className="text-teal-200 hover:text-white transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[var(--bg)]">
+            {chatMessages.map((msg, idx) => (
+              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-teal-600 text-white rounded-br-none' : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] rounded-bl-none'}`}>
+                  {msg.text}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <form onSubmit={handleChatSubmit} className="p-3 bg-[var(--card-bg)] border-t border-[var(--border)] flex gap-2">
+            <input 
+              type="text" 
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder="Ask your mentor..."
+              className="flex-1 app-input text-sm rounded-full px-4"
+            />
+            <button 
+              type="submit"
+              disabled={!chatInput.trim()}
+              className="p-2 bg-teal-700 text-white rounded-full hover:bg-teal-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

@@ -64,7 +64,7 @@ def extract_video_id(url: str) -> str | None:
                 return vid_id
     return None
 
-def fetch_youtube_transcript(url: str) -> list[dict] | None:
+def fetch_youtube_transcript(url: str, target_lang: str = 'en') -> list[dict] | None:
     """
     Fetch the transcript for a YouTube video URL.
     Returns a list of dicts with 'id', 'start', 'end', 'text', 
@@ -80,27 +80,65 @@ def fetch_youtube_transcript(url: str) -> list[dict] | None:
         transcript_list_obj = api.list(video_id)
         
         try:
-            # Try to get English transcript directly
-            transcript = transcript_list_obj.find_transcript(['en'])
+            if target_lang and target_lang != 'original':
+                # Try to get the requested transcript directly
+                transcript = transcript_list_obj.find_transcript([target_lang])
+            else:
+                # If 'original', just get the first available
+                transcript = next(iter(transcript_list_obj))
         except Exception:
-            # If not found, get the first available transcript
+            # If requested language not found, get the first available transcript and translate
             try:
                 transcript = next(iter(transcript_list_obj))
-                if transcript.is_translatable:
-                    transcript = transcript.translate('en')
+                if target_lang and target_lang != 'original' and transcript.is_translatable:
+                    transcript = transcript.translate(target_lang)
             except Exception:
                 raise NoTranscriptFound(video_id)
                 
         transcript_data = transcript.fetch()
         
-        # Format it into the structure our frontend expects
+        # Format it into the structure our frontend expects, grouped by ~10 second chunks
         formatted_transcript = []
-        for i, segment in enumerate(transcript_data):
+        current_chunk = None
+        
+        for segment in transcript_data:
+            start = segment.start if hasattr(segment, 'start') else segment.get('start', 0.0)
+            duration = segment.duration if hasattr(segment, 'duration') else segment.get('duration', 0.0)
+            end = start + duration
+            text = (segment.text if hasattr(segment, 'text') else segment.get('text', '')).replace('\n', ' ').strip()
+            
+            if not text:
+                continue
+                
+            if current_chunk is None:
+                current_chunk = {
+                    "start": start,
+                    "end": end,
+                    "text": text
+                }
+            else:
+                if start - current_chunk["start"] >= 10.0:
+                    formatted_transcript.append({
+                        "id": len(formatted_transcript) + 1,
+                        "start": current_chunk["start"],
+                        "end": current_chunk["end"],
+                        "text": current_chunk["text"]
+                    })
+                    current_chunk = {
+                        "start": start,
+                        "end": end,
+                        "text": text
+                    }
+                else:
+                    current_chunk["end"] = end
+                    current_chunk["text"] += " " + text
+                    
+        if current_chunk is not None:
             formatted_transcript.append({
-                "id": i + 1,
-                "start": segment.start if hasattr(segment, 'start') else segment.get('start', 0.0),
-                "end": (segment.start + segment.duration) if hasattr(segment, 'start') else (segment.get('start', 0.0) + segment.get('duration', 0.0)),
-                "text": (segment.text if hasattr(segment, 'text') else segment.get('text', '')).replace('\n', ' ')
+                "id": len(formatted_transcript) + 1,
+                "start": current_chunk["start"],
+                "end": current_chunk["end"],
+                "text": current_chunk["text"]
             })
             
         return formatted_transcript

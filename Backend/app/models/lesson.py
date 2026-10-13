@@ -77,6 +77,12 @@ class Lesson(Base):
         String(255), nullable=True, default=None,
         comment="Original filename of the uploaded PDF, for display",
     )
+    test_cases: Mapped[list[dict] | None] = mapped_column(
+        JSON().with_variant(JSONB, 'postgresql'),
+        nullable=True,
+        default=None,
+    )
+
     notes_content: Mapped[str | None] = mapped_column(
         Text, nullable=True, default=None,
         comment="Instructor-authored reading notes for this lesson (shown to every student)",
