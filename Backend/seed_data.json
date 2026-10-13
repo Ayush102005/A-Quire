@@ -1,4 +1,186 @@
 {
+  "users": [
+    {
+      "id": 1,
+      "firebase_uid": "QUtPBVsAxQTAgOOhaYpdYuuMGNr2",
+      "email": "ayushsingh10200@gmail.com",
+      "full_name": "Ayush Singh",
+      "hashed_password": null,
+      "role": "student",
+      "is_active": 1,
+      "email_verified": 0,
+      "onboarding_complete": 0,
+      "goals": null,
+      "interests": null,
+      "language": "en",
+      "timezone": null,
+      "email_notifications": 1,
+      "reminder_frequency": null,
+      "created_at": "2026-09-21 14:05:54.257601",
+      "preferences": "{}",
+      "institution_id": null
+    },
+    {
+      "id": 2,
+      "firebase_uid": "iHTFxybDujZdxryiIcEij3UzxWT2",
+      "email": "ayushb.23.becs@acharya.ac.in",
+      "full_name": "AYUSH KUMAR SINGH AIT23BECS120",
+      "hashed_password": null,
+      "role": "student",
+      "is_active": 1,
+      "email_verified": 1,
+      "onboarding_complete": 0,
+      "goals": null,
+      "interests": null,
+      "language": "en",
+      "timezone": null,
+      "email_notifications": 1,
+      "reminder_frequency": null,
+      "created_at": "2026-09-21 14:07:59.343044",
+      "preferences": "{}",
+      "institution_id": null
+    },
+    {
+      "id": 3,
+      "firebase_uid": "lsZ4SaEJvcZyZR5MuOXAkL7qL5D2",
+      "email": "ayushsingh10005@gmail.com",
+      "full_name": "AYUSH",
+      "hashed_password": null,
+      "role": "student",
+      "is_active": 1,
+      "email_verified": 0,
+      "onboarding_complete": 0,
+      "goals": null,
+      "interests": null,
+      "language": "en",
+      "timezone": null,
+      "email_notifications": 1,
+      "reminder_frequency": null,
+      "created_at": "2026-09-22 02:32:33.974508",
+      "preferences": "{}",
+      "institution_id": null
+    },
+    {
+      "id": 4,
+      "firebase_uid": "HMZBvbqjYsSq9muYtecsOcBADfs1",
+      "email": "ayushsingh1020@gmail.com",
+      "full_name": "AYUSH",
+      "hashed_password": null,
+      "role": "instructor",
+      "is_active": 1,
+      "email_verified": 0,
+      "onboarding_complete": 0,
+      "goals": null,
+      "interests": null,
+      "language": "en",
+      "timezone": null,
+      "email_notifications": 1,
+      "reminder_frequency": null,
+      "created_at": "2026-09-22 02:33:42.599282",
+      "preferences": "{}",
+      "institution_id": null
+    },
+    {
+      "id": 5,
+      "firebase_uid": "GpK7b7xKoIfBHKzBIdwuFzZNxy02",
+      "email": "ayushsingh102005@gmail.com",
+      "full_name": "Ayush Kumar Singh",
+      "hashed_password": null,
+      "role": "student",
+      "is_active": 1,
+      "email_verified": 1,
+      "onboarding_complete": 0,
+      "goals": null,
+      "interests": null,
+      "language": "en",
+      "timezone": null,
+      "email_notifications": 1,
+      "reminder_frequency": null,
+      "created_at": "2026-09-23 06:04:58.559986",
+      "preferences": "{}",
+      "institution_id": null
+    },
+    {
+      "id": 6,
+      "firebase_uid": null,
+      "email": "student@iit.edu",
+      "full_name": "Demo Student",
+      "hashed_password": "$2b$12$oxHLU29n3Mh8fCYjM1VqiuhsmEOIZ/VgckFZSw35Qk/EirEr3GCNC",
+      "role": "student",
+      "is_active": 1,
+      "email_verified": 1,
+      "onboarding_complete": 1,
+      "goals": null,
+      "interests": null,
+      "language": "en",
+      "timezone": null,
+      "email_notifications": 1,
+      "reminder_frequency": null,
+      "created_at": "2026-10-05 03:24:39.321487",
+      "preferences": "{}",
+      "institution_id": null
+    },
+    {
+      "id": 7,
+      "firebase_uid": null,
+      "email": "alan@iit.edu",
+      "full_name": "Alan (Instructor)",
+      "hashed_password": "$2b$12$2UHenI/nqyACdhd.SPV.ieuwFblba28S7A4RW6BY3U0GcdjpslqEC",
+      "role": "instructor",
+      "is_active": 1,
+      "email_verified": 1,
+      "onboarding_complete": 1,
+      "goals": null,
+      "interests": null,
+      "language": "en",
+      "timezone": null,
+      "email_notifications": 1,
+      "reminder_frequency": null,
+      "created_at": "2026-10-05 03:24:39.321491",
+      "preferences": "{}",
+      "institution_id": null
+    },
+    {
+      "id": 8,
+      "firebase_uid": null,
+      "email": "admin@aquire.io",
+      "full_name": "A-Quire Admin",
+      "hashed_password": "$2b$12$NPQZ7KPdry5P9XcuzFBv2.1.5etJhF1Mn/tj4qwc3WSt3amY3yAE.",
+      "role": "admin",
+      "is_active": 1,
+      "email_verified": 1,
+      "onboarding_complete": 1,
+      "goals": null,
+      "interests": null,
+      "language": "en",
+      "timezone": null,
+      "email_notifications": 1,
+      "reminder_frequency": null,
+      "created_at": "2026-10-05 03:24:39.321493",
+      "preferences": "{}",
+      "institution_id": null
+    },
+    {
+      "id": 9,
+      "firebase_uid": "4uZeMq3SwaeDF2I4z4lBgS26T5X2",
+      "email": "ayushsingh102@gmail.com",
+      "full_name": "Ayush Singh",
+      "hashed_password": null,
+      "role": "student",
+      "is_active": 1,
+      "email_verified": 0,
+      "onboarding_complete": 0,
+      "goals": null,
+      "interests": null,
+      "language": "en",
+      "timezone": null,
+      "email_notifications": 1,
+      "reminder_frequency": null,
+      "created_at": "2026-10-13 13:05:42.582297",
+      "preferences": "{}",
+      "institution_id": null
+    }
+  ],
   "institutions": [
     {
       "id": 1,
@@ -31,6 +213,129 @@
       "mrr": 0.0,
       "status": "Trial",
       "created_at": "2026-10-05 04:43:08.884046"
+    }
+  ],
+  "invoices": [
+    {
+      "id": 1,
+      "invoice_number": "INV-2026-104",
+      "institution_id": 1,
+      "amount": 420000.0,
+      "status": "Paid",
+      "created_at": "2026-10-05 04:43:08.907224"
+    },
+    {
+      "id": 2,
+      "invoice_number": "INV-2026-103",
+      "institution_id": 2,
+      "amount": 280000.0,
+      "status": "Paid",
+      "created_at": "2026-10-05 04:43:08.907228"
+    },
+    {
+      "id": 3,
+      "invoice_number": "INV-2026-102",
+      "institution_id": 3,
+      "amount": 150000.0,
+      "status": "Paid",
+      "created_at": "2026-10-05 04:43:08.907228"
+    }
+  ],
+  "moderation_reports": [
+    {
+      "id": 1,
+      "report_type": "Inappropriate Content",
+      "course_context": "Physics 301 · Entropy Notes",
+      "reporter": "Priya Nair",
+      "severity": "high",
+      "is_resolved": 0,
+      "created_at": "2026-10-05 04:43:08.910349"
+    },
+    {
+      "id": 2,
+      "report_type": "Plagiarism Flag",
+      "course_context": "Math 201 · Assignment 3",
+      "reporter": "System AI",
+      "severity": "medium",
+      "is_resolved": 0,
+      "created_at": "2026-10-05 04:43:08.910353"
+    },
+    {
+      "id": 3,
+      "report_type": "Abusive Language",
+      "course_context": "Chem 101 · Discussion",
+      "reporter": "Riya Sharma",
+      "severity": "high",
+      "is_resolved": 0,
+      "created_at": "2026-10-05 04:43:08.910354"
+    },
+    {
+      "id": 4,
+      "report_type": "Copyright Violation",
+      "course_context": "Bio 401 · Lecture Upload",
+      "reporter": "Karan Verma",
+      "severity": "medium",
+      "is_resolved": 0,
+      "created_at": "2026-10-05 04:43:08.910354"
+    },
+    {
+      "id": 5,
+      "report_type": "Spam Report",
+      "course_context": "CS 101 · Forum",
+      "reporter": "System AI",
+      "severity": "low",
+      "is_resolved": 0,
+      "created_at": "2026-10-05 04:43:08.910355"
+    }
+  ],
+  "audit_logs": [
+    {
+      "id": 1,
+      "actor": "admin@aquire.in",
+      "action": "Suspended user account",
+      "target": "riya.sharma@iit.ac.in",
+      "log_type": "danger",
+      "created_at": "2026-10-05 04:43:08.902710"
+    },
+    {
+      "id": 2,
+      "actor": "System",
+      "action": "Auto-renewed subscription",
+      "target": "IIT Bombay · Enterprise",
+      "log_type": "success",
+      "created_at": "2026-10-05 04:43:08.902713"
+    },
+    {
+      "id": 3,
+      "actor": "billing@aquire.in",
+      "action": "Updated plan pricing",
+      "target": "Academic Pro tier",
+      "log_type": "warn",
+      "created_at": "2026-10-05 04:43:08.902714"
+    },
+    {
+      "id": 4,
+      "actor": "System",
+      "action": "Backup completed",
+      "target": "DB snapshot v2026-05-17",
+      "log_type": "success",
+      "created_at": "2026-10-05 04:43:08.902715"
+    },
+    {
+      "id": 5,
+      "actor": "admin@aquire.in",
+      "action": "Bulk-exported user data",
+      "target": "2,400 records · CSV",
+      "log_type": "warn",
+      "created_at": "2026-10-05 04:43:08.902715"
+    },
+    {
+      "id": 6,
+      "actor": "System",
+      "action": "AI model updated",
+      "target": "Intervention model v2.4",
+      "log_type": "info",
+      "created_at": "2026-10-05 04:43:08.902716"
     }
   ],
   "topics": [
@@ -205,10 +510,10 @@
       "category": "Arrays",
       "difficulty": "Easy",
       "topic": "Arrays, HashMap, Frequency Counting",
-      "problem_statement": "Given an array of integers `arr` of size `N`, find the sum of all elements that occur exactly once in the array.\n\nAn element is considered unique if its frequency is 1.\n\nReturn the sum of all unique elements.\n\n#### Input\n- First line contains an integer `N`.\n- Second line contains `N` space-separated integers.\n\n#### Output\nPrint the sum of all unique elements.\n\n#### Constraints\n- 1 \u2264 N \u2264 100000\n- -10^9 \u2264 arr[i] \u2264 10^9\n\n#### Example 1\nInput:\n5\n1 2 2 3 4\n\nOutput:\n8\n\nExplanation:\nUnique elements are 1, 3, and 4.\nTheir sum is 8.\n\n#### Example 2\nInput:\n6\n5 5 5 5 5 5\n\nOutput:\n0\n\nExplanation:\nNo element occurs exactly once.",
+      "problem_statement": "Given an array of integers `arr` of size `N`, find the sum of all elements that occur exactly once in the array.\n\nAn element is considered unique if its frequency is 1.\n\nReturn the sum of all unique elements.\n\n#### Input\n- First line contains an integer `N`.\n- Second line contains `N` space-separated integers.\n\n#### Output\nPrint the sum of all unique elements.\n\n#### Constraints\n- 1 ≤ N ≤ 100000\n- -10^9 ≤ arr[i] ≤ 10^9\n\n#### Example 1\nInput:\n5\n1 2 2 3 4\n\nOutput:\n8\n\nExplanation:\nUnique elements are 1, 3, and 4.\nTheir sum is 8.\n\n#### Example 2\nInput:\n6\n5 5 5 5 5 5\n\nOutput:\n0\n\nExplanation:\nNo element occurs exactly once.",
       "examples": "",
       "constraints": "",
-      "approaches": "## Approach 1: Brute Force\nFor every element, count its occurrences by traversing the array again.\nIf frequency is 1, add it to the answer.\n\n### Steps\n1. Iterate through each element.\n2. Count its frequency.\n3. Add to sum if frequency equals 1.\n\nTime Complexity: O(N\u00b2)\nSpace Complexity: O(1)\n\n---\n\n## Approach 2: HashMap (Optimal)\nUse a HashMap to store frequencies of all elements.\n\n### Steps\n1. Traverse the array and store frequencies.\n2. Traverse the frequency map.\n3. Add keys having frequency 1.\n\nTime Complexity: O(N)\nSpace Complexity: O(N)",
+      "approaches": "## Approach 1: Brute Force\nFor every element, count its occurrences by traversing the array again.\nIf frequency is 1, add it to the answer.\n\n### Steps\n1. Iterate through each element.\n2. Count its frequency.\n3. Add to sum if frequency equals 1.\n\nTime Complexity: O(N²)\nSpace Complexity: O(1)\n\n---\n\n## Approach 2: HashMap (Optimal)\nUse a HashMap to store frequencies of all elements.\n\n### Steps\n1. Traverse the array and store frequencies.\n2. Traverse the frequency map.\n3. Add keys having frequency 1.\n\nTime Complexity: O(N)\nSpace Complexity: O(N)",
       "code_solutions": "### Python\n```python\nn = int(input())\narr = list(map(int, input().split()))\n\nfreq = {}\n\nfor num in arr:\n    freq[num] = freq.get(num, 0) + 1\n\nans = 0\n\nfor num, count in freq.items():\n    if count == 1:\n        ans += num\n\nprint(ans)\n```\n\n### Java\n```java\nimport java.util.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n\n        int n = sc.nextInt();\n        HashMap<Integer, Integer> freq = new HashMap<>();\n\n        for(int i = 0; i < n; i++) {\n            int x = sc.nextInt();\n            freq.put(x, freq.getOrDefault(x, 0) + 1);\n        }\n\n        long sum = 0;\n\n        for(Map.Entry<Integer, Integer> entry : freq.entrySet()) {\n            if(entry.getValue() == 1) {\n                sum += entry.getKey();\n            }\n        }\n\n        System.out.println(sum);\n    }\n}\n```",
       "complexity_time": "O(N)",
       "complexity_space": "O(N)",
@@ -232,10 +537,10 @@
       "category": "Arrays",
       "difficulty": "Easy",
       "topic": "Arrays, Traversal",
-      "problem_statement": "Given an array of N integers, find the maximum value of arr[j] - arr[i] such that j > i.\n\nIf no positive difference exists, return 0.\n\n#### Input\n- First line contains an integer N.\n- Second line contains N space-separated integers.\n\n#### Output\nPrint the maximum difference.\n\n#### Constraints\n- 2 \u2264 N \u2264 100000\n- -10^9 \u2264 arr[i] \u2264 10^9\n\n#### Example 1\nInput:\n6\n7 1 5 4 6 8\n\nOutput:\n7\n\nExplanation:\nMaximum difference is 8 - 1 = 7.\n\n#### Example 2\nInput:\n5\n9 8 7 6 5\n\nOutput:\n0\n\nExplanation:\nNo larger element appears after a smaller element.",
+      "problem_statement": "Given an array of N integers, find the maximum value of arr[j] - arr[i] such that j > i.\n\nIf no positive difference exists, return 0.\n\n#### Input\n- First line contains an integer N.\n- Second line contains N space-separated integers.\n\n#### Output\nPrint the maximum difference.\n\n#### Constraints\n- 2 ≤ N ≤ 100000\n- -10^9 ≤ arr[i] ≤ 10^9\n\n#### Example 1\nInput:\n6\n7 1 5 4 6 8\n\nOutput:\n7\n\nExplanation:\nMaximum difference is 8 - 1 = 7.\n\n#### Example 2\nInput:\n5\n9 8 7 6 5\n\nOutput:\n0\n\nExplanation:\nNo larger element appears after a smaller element.",
       "examples": "",
       "constraints": "",
-      "approaches": "## Brute Force\nCheck every pair (i, j) where j > i.\n\nTime Complexity: O(N\u00b2)\nSpace Complexity: O(1)\n\n---\n\n## Optimal Approach\nKeep track of the minimum element seen so far.\nFor each element, calculate the difference with the minimum value.\nUpdate the maximum difference accordingly.\n\nTime Complexity: O(N)\nSpace Complexity: O(1)",
+      "approaches": "## Brute Force\nCheck every pair (i, j) where j > i.\n\nTime Complexity: O(N²)\nSpace Complexity: O(1)\n\n---\n\n## Optimal Approach\nKeep track of the minimum element seen so far.\nFor each element, calculate the difference with the minimum value.\nUpdate the maximum difference accordingly.\n\nTime Complexity: O(N)\nSpace Complexity: O(1)",
       "code_solutions": "",
       "complexity_time": "O(N)",
       "complexity_space": "O(1)",
@@ -473,6 +778,5 @@
       "is_flagged": 0,
       "is_provisional": 1
     }
-  ],
-  "student_notes": []
+  ]
 }
