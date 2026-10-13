@@ -806,6 +806,42 @@ export const api = {
       });
     },
   },
+
+  // Admin Management
+  admin: {
+    async getDashboard() {
+      return request("/admin/dashboard");
+    },
+    async addInstitution(data) {
+      return request("/admin/institutions", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    async updateUserRole(userId, role) {
+      return request(`/admin/users/${userId}/role`, {
+        method: "PUT",
+        body: JSON.stringify({ role }),
+      });
+    },
+    async updateUserStatus(userId, isActive) {
+      return request(`/admin/users/${userId}/status`, {
+        method: "PUT",
+        body: JSON.stringify({ is_active: isActive }),
+      });
+    },
+    async updateUserInstitution(userId, institutionId) {
+      return request(`/admin/users/${userId}/institution`, {
+        method: "PUT",
+        body: JSON.stringify({ institution_id: institutionId }),
+      });
+    },
+    async resolveModeration(reportId) {
+      return request(`/admin/moderation/${reportId}/resolve`, {
+        method: "POST",
+      });
+    },
+  },
 };
 
 // WebSocket connection utility
