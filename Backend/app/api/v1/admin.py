@@ -6,7 +6,7 @@ Admin dashboard routes.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.roles import get_admin_user
@@ -46,6 +46,13 @@ async def get_admin_dashboard(
     # Fetch data from admin tables
     inst_result = await db.execute(select(Institution).order_by(Institution.created_at.desc()))
     institutions = inst_result.scalars().all()
+
+    inst_user_counts_res = await db.execute(
+        select(User.institution_id, func.count(User.id))
+        .where(User.institution_id.isnot(None))
+        .group_by(User.institution_id)
+    )
+    inst_users_map = {row[0]: row[1] for row in inst_user_counts_res.all()}
 
     inv_result = await db.execute(select(Invoice, Institution).join(Institution).order_by(Invoice.created_at.desc()))
     invoices = inv_result.all()
@@ -121,7 +128,7 @@ async def get_admin_dashboard(
         "institutions": [{
                 "id": inst.id,
                 "name": inst.name,
-                "users": "Unknown",  # We don't track users per institution yet
+                "users": inst_users_map.get(inst.id, 0),
                 "tier": inst.tier,
                 "mrr": f"₹{inst.mrr:,.1f}L" if inst.mrr >= 100000 else f"₹{inst.mrr:,.0f}",
                 "status": inst.status,
@@ -191,6 +198,55 @@ async def create_institution(
     await db.refresh(institution)
     
     return institution
+
+@router.delete("/admin/institutions/{institution_id}")
+async def delete_institution(
+    institution_id: int,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Institution).where(Institution.id == institution_id))
+    institution = result.scalar_one_or_none()
+    if not institution:
+        raise HTTPException(status_code=404, detail="Institution not found")
+
+    inst_name = institution.name
+
+    # 1. Unlink users associated with this institution
+    await db.execute(
+        update(User)
+        .where(User.institution_id == institution_id)
+        .values(institution_id=None)
+    )
+
+    # 2. Unlink courses associated with this institution
+    await db.execute(
+        update(Course)
+        .where(Course.institution_id == institution_id)
+        .values(institution_id=None)
+    )
+
+    # 3. Delete any invoices linked to this institution
+    await db.execute(
+        delete(Invoice)
+        .where(Invoice.institution_id == institution_id)
+    )
+
+    # 4. Delete the institution
+    await db.delete(institution)
+
+    # 5. Log audit entry
+    audit_log = AuditLog(
+        actor=current_user.email,
+        action="Deleted institution",
+        target=inst_name,
+        log_type="danger",
+    )
+    db.add(audit_log)
+
+    await db.commit()
+
+    return {"status": "success", "message": f"Institution '{inst_name}' deleted"}
 
 from pydantic import BaseModel
 from fastapi import HTTPException

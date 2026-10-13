@@ -30,11 +30,11 @@ class Institution(Base):
     )
     
     users: Mapped[list["User"]] = relationship(
-        "User", back_populates="institution", cascade="all, delete-orphan", lazy="select",
+        "User", back_populates="institution", lazy="select",
     )
     
     courses: Mapped[list["Course"]] = relationship(
-        "Course", back_populates="institution", cascade="all, delete-orphan", lazy="select",
+        "Course", back_populates="institution", lazy="select",
     )
 
 class Invoice(Base):

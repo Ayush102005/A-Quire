@@ -5,7 +5,7 @@ import {
   Activity, FileText, Settings, Bell, Search, ChevronRight,
   AlertTriangle, CheckCircle2, Clock, TrendingUp, Database,
   Download, RefreshCw, Eye, Ban, Flag, Zap, Globe, Lock,
-  ArrowUpRight, ArrowDownRight, Brain, LogOut, Check, X
+  ArrowUpRight, ArrowDownRight, Brain, LogOut, Check, X, Trash2
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import { api } from '../services/api';
@@ -227,6 +227,7 @@ function InstitutionsTab({ institutionsData, onRefresh }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', tier: 'Enterprise', mrr: '', status: 'Healthy' });
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -239,11 +240,33 @@ function InstitutionsTab({ institutionsData, onRefresh }) {
         status: formData.status
       });
       setIsModalOpen(false);
+      setFormData({ name: '', tier: 'Enterprise', mrr: '', status: 'Healthy' });
       if (onRefresh) onRefresh();
     } catch (err) {
       alert("Failed to add institution: " + err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (inst) => {
+    if (!inst?.id) {
+      alert("Cannot delete institution: missing ID.");
+      return;
+    }
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${inst.name}"?\nThis will remove the institution and unlink associated users and courses.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(inst.id);
+    try {
+      await api.admin.deleteInstitution(inst.id);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      alert("Failed to delete institution: " + err.message);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -319,19 +342,34 @@ function InstitutionsTab({ institutionsData, onRefresh }) {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {insts.map((inst, i) => (
-            <div key={i} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-5 flex items-center justify-between shadow-sm hover:border-teal-300 transition-colors cursor-pointer">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-[var(--surface-2)] rounded-lg flex items-center justify-center">
+            <div key={inst.id || i} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-5 flex items-center justify-between shadow-sm hover:border-teal-300 transition-colors">
+              <div className="flex items-center gap-4 min-w-0 pr-2">
+                <div className="w-12 h-12 bg-[var(--surface-2)] rounded-lg flex items-center justify-center shrink-0">
                   <Building2 className="w-6 h-6 text-[var(--text-muted)]" />
                 </div>
-                <div>
-                  <h3 className="font-bold text-[var(--text)]">{inst.name}</h3>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-[var(--text)] truncate">{inst.name}</h3>
                   <p className="text-xs text-[var(--text-muted)] mt-1">{inst.users} active users · {inst.tier}</p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="font-bold text-[var(--text)] tabular-nums">{inst.mrr}</p>
-                <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${inst.status === 'Healthy' ? 'text-emerald-600' : inst.status === 'Trial' ? 'text-indigo-600' : 'text-amber-600'}`}>{inst.status}</p>
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="text-right">
+                  <p className="font-bold text-[var(--text)] tabular-nums">{inst.mrr}</p>
+                  <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${inst.status === 'Healthy' ? 'text-emerald-600' : inst.status === 'Trial' ? 'text-indigo-600' : 'text-amber-600'}`}>{inst.status}</p>
+                </div>
+                <button
+                  type="button"
+                  title={`Delete ${inst.name}`}
+                  disabled={deletingId === inst.id}
+                  onClick={() => handleDelete(inst)}
+                  className="p-2 text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors disabled:opacity-50 focus-visible:outline-none"
+                >
+                  {deletingId === inst.id ? (
+                    <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                </button>
               </div>
             </div>
           ))}

@@ -761,42 +761,6 @@ export const api = {
     },
   },
 
-  // Admin dashboard
-  admin: {
-    async getDashboard() {
-      return request("/admin/dashboard");
-    },
-    async addInstitution(data) {
-      return request("/admin/institutions", {
-        method: "POST",
-        body: JSON.stringify(data)
-      });
-    },
-    async updateUserRole(userId, role) {
-      return request(`/admin/users/${userId}/role`, {
-        method: "PUT",
-        body: JSON.stringify({ role })
-      });
-    },
-    async updateUserInstitution(userId, institutionId) {
-      return request(`/admin/users/${userId}/institution`, {
-        method: "PUT",
-        body: JSON.stringify({ institution_id: institutionId })
-      });
-    },
-    async updateUserStatus(userId, isActive) {
-      return request(`/admin/users/${userId}/status`, {
-        method: "PUT",
-        body: JSON.stringify({ is_active: isActive })
-      });
-    },
-    async resolveModeration(reportId) {
-      return request(`/admin/moderation/${reportId}/resolve`, {
-        method: "PUT"
-      });
-    }
-  },
-
   // Global Mentor Chat
   mentor: {
     async chat(message, history = []) {
@@ -816,6 +780,11 @@ export const api = {
       return request("/admin/institutions", {
         method: "POST",
         body: JSON.stringify(data),
+      });
+    },
+    async deleteInstitution(institutionId) {
+      return request(`/admin/institutions/${institutionId}`, {
+        method: "DELETE",
       });
     },
     async updateUserRole(userId, role) {
@@ -838,7 +807,7 @@ export const api = {
     },
     async resolveModeration(reportId) {
       return request(`/admin/moderation/${reportId}/resolve`, {
-        method: "POST",
+        method: "PUT",
       });
     },
   },
