@@ -11,6 +11,6 @@ class InstitutionCreate(BaseModel):
 class InstitutionResponse(InstitutionCreate):
     id: int
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
