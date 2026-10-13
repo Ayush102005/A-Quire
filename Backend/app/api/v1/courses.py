@@ -178,6 +178,7 @@ async def create_course(
         title=body.title, 
         description=body.description, 
         exam_category=body.exam_category, 
+        is_published=body.is_published,
         instructor_id=current_user.id,
         institution_id=current_user.institution_id
     )

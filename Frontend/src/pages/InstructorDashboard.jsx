@@ -101,21 +101,44 @@ function CourseCard({ course, onEdit, onTogglePublish, onDelete, onExpand, expan
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-sm font-semibold text-[var(--text)] truncate">{course.title}</p>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-              course.is_published ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-[var(--surface-2)] text-[var(--text-muted)] border-[var(--border)]'
-            }`}>
-              {course.is_published ? 'Published' : 'Draft'}
-            </span>
+            <button
+              type="button"
+              onClick={() => onTogglePublish(course)}
+              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all flex items-center gap-1 cursor-pointer ${
+                course.is_published 
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
+                  : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+              }`}
+              title={course.is_published ? "Click to unpublish (hide from students)" : "Click to publish (make visible to students)"}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${course.is_published ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
+              {course.is_published ? 'Published' : 'Draft · Click to Publish'}
+            </button>
           </div>
           <p className="text-xs text-[var(--text-faint)] mt-0.5">{course.modules?.length ?? 0} modules · {lessonCount} lessons</p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <button
+            type="button"
             onClick={() => onTogglePublish(course)}
-            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-teal-700 hover:bg-teal-50 transition-colors"
-            title={course.is_published ? 'Unpublish' : 'Publish'}
+            className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border ${
+              course.is_published
+                ? 'border-[var(--border)] text-[var(--text-muted)] hover:text-amber-700 hover:bg-amber-50'
+                : 'bg-teal-700 text-white border-teal-700 hover:bg-teal-800 shadow-sm'
+            }`}
+            title={course.is_published ? 'Unpublish course (hide from student catalog)' : 'Publish course (make visible to all students)'}
           >
-            {course.is_published ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            {course.is_published ? (
+              <>
+                <EyeOff className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Unpublish</span>
+              </>
+            ) : (
+              <>
+                <Eye className="w-3.5 h-3.5" />
+                <span>Publish Course</span>
+              </>
+            )}
           </button>
           <button onClick={() => onEdit(course)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Edit">
             <Edit3 className="w-3.5 h-3.5" />
@@ -859,7 +882,7 @@ function CoursesTab() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editCourse, setEditCourse] = useState(null);
-  const [form, setForm] = useState({ title: '', description: '', exam_category: 'Other' });
+  const [form, setForm] = useState({ title: '', description: '', exam_category: 'Other', is_published: true });
   const [saving, setSaving] = useState(false);
   const [expandedCourse, setExpandedCourse] = useState(null);
 
@@ -883,10 +906,13 @@ function CoursesTab() {
     if (!form.title.trim()) return;
     setSaving(true);
     try {
-      const course = await api.instructor.createCourse(form.title.trim(), form.description.trim(), form.exam_category);
+      let course = await api.instructor.createCourse(form.title.trim(), form.description.trim(), form.exam_category, form.is_published);
+      if (form.is_published && !course.is_published) {
+        course = await api.instructor.publishCourse(course.id);
+      }
       setCourses(prev => [course, ...prev]);
       setShowCreateModal(false);
-      setForm({ title: '', description: '', exam_category: 'Other' });
+      setForm({ title: '', description: '', exam_category: 'Other', is_published: true });
     } catch (err) {
       alert('Failed to create course: ' + err.message);
     } finally {
@@ -982,13 +1008,22 @@ function CoursesTab() {
           message="Create your first course to get started."
           action={
             <button
-              onClick={() => { setForm({ title: '', description: '', exam_category: 'Other' }); setShowCreateModal(true); }}
+              onClick={() => { setForm({ title: '', description: '', exam_category: 'Other', is_published: true }); setShowCreateModal(true); }}
               className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-teal-700 text-white rounded-xl hover:bg-teal-800 transition-colors"
             >
               <Plus className="w-4 h-4" /> Create Course
             </button>
           }
         />
+      )}
+      {!loading && !error && courses.some(c => !c.is_published) && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-start gap-3 text-xs text-amber-900 shadow-sm">
+          <Eye className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-bold text-amber-950">You have courses in Draft mode</p>
+            <p className="mt-0.5 text-amber-800">Courses marked as <span className="font-semibold text-amber-950">Draft</span> are hidden from student search and enrollment. Click <span className="font-semibold text-teal-800">"Publish Course"</span> on any course below to make it immediately visible to students.</p>
+          </div>
+        </div>
       )}
       {!loading && !error && courses.map(course => (
         <CourseCard
@@ -1043,6 +1078,15 @@ function CoursesTab() {
                 className={textareaCls}
               />
             </Field>
+            <label className="flex items-center gap-2 pt-1 text-xs font-medium text-[var(--text)] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.is_published}
+                onChange={e => setForm(f => ({ ...f, is_published: e.target.checked }))}
+                className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-stone-300"
+              />
+              <span>Publish course immediately (visible to all students in catalog)</span>
+            </label>
             <div className="flex gap-2 pt-1">
               <button
                 id="confirm-create-course-btn"

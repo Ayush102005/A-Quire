@@ -436,10 +436,10 @@ export const api = {
     async myCourses() {
       return request("/courses/my-courses");
     },
-    async createCourse(title, description = "", examCategory = "Other") {
+    async createCourse(title, description = "", examCategory = "Other", isPublished = true) {
       return request("/courses", {
         method: "POST",
-        body: JSON.stringify({ title, description, exam_category: examCategory }),
+        body: JSON.stringify({ title, description, exam_category: examCategory, is_published: isPublished }),
       });
     },
     async updateCourse(courseId, fields) {

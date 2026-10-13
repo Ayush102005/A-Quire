@@ -161,6 +161,7 @@ class CourseCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255, strip_whitespace=True)
     description: str | None = Field(None, max_length=2000, strip_whitespace=True)
     exam_category: str = Field(default="Other", max_length=50, strip_whitespace=True)
+    is_published: bool = Field(default=False)
 
 
 class CourseUpdate(BaseModel):
