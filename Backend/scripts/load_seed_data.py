@@ -7,7 +7,12 @@ from __future__ import annotations
 
 import json
 import asyncio
+import sys
 from pathlib import Path
+
+backend_dir = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(backend_dir))
+
 from sqlalchemy import text
 from app.db.session import AsyncSessionLocal
 
