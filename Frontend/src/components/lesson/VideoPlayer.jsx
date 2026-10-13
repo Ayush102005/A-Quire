@@ -18,6 +18,8 @@ const getYouTubeApi = () => {
 
       const tag = document.createElement('script');
       tag.src = 'https://www.youtube.com/iframe_api';
+      // Note: the IFrame API script itself must still be youtube.com,
+      // but we set host in playerVars to use the privacy-enhanced nocookie domain
       tag.async = true;
       const firstScriptTag = document.getElementsByTagName('script')[0];
       firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
@@ -132,6 +134,7 @@ export default function VideoPlayer({
             iv_load_policy: 3,
             enablejsapi: 1,
             origin: window.location.origin,
+            host: 'https://www.youtube-nocookie.com',
             start: Math.floor(initialTime),
           },
           events: {
