@@ -216,6 +216,9 @@ export default function MyCourses() {
       );
       const availableCatalog = all.filter(c => !enrolledIds.has(c.id)).map(c => ({ ...c, progress: 0, enrolled: false }));
       setCourses([...enrolledWithProgress, ...availableCatalog]);
+      if (enrolled.length === 0 && availableCatalog.length > 0) {
+        setActiveTab('Available Catalog');
+      }
       setLoading(false);
     }
     loadData();
@@ -340,10 +343,24 @@ export default function MyCourses() {
                 {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
               </div>
             ) : filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center premium-card rounded-2xl">
-                <BookX className="w-10 h-10 text-stone-300 mb-3" />
-                <p className="text-stone-500 font-medium">No courses found matching criteria.</p>
-              </div>
+              activeTab === 'All Enrolled' && counts['Available Catalog'] > 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center premium-card rounded-2xl">
+                  <BookOpen className="w-10 h-10 text-teal-600 mb-3" />
+                  <h3 className="text-base font-semibold text-stone-900">You haven't enrolled in any courses yet</h3>
+                  <p className="text-xs text-stone-500 mt-1 max-w-sm mb-4">Explore our course catalog to find syllabus series, lectures, and practice problems.</p>
+                  <button
+                    onClick={() => setActiveTab('Available Catalog')}
+                    className="btn-primary text-xs px-4 py-2 inline-flex items-center gap-2"
+                  >
+                    Browse Available Catalog ({counts['Available Catalog']}) <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-20 text-center premium-card rounded-2xl">
+                  <BookX className="w-10 h-10 text-stone-300 mb-3" />
+                  <p className="text-stone-500 font-medium">No courses found matching criteria.</p>
+                </div>
+              )
             ) : (
               <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5 stagger-children">
                 {filtered.map(course => (

@@ -107,6 +107,7 @@ export default function StudentDashboard() {
   const [continueLesson, setContinueLesson] = useState(null);
   const [stats, setStats] = useState(null);
   const [courses, setCourses] = useState(null);
+  const [catalogCourses, setCatalogCourses] = useState([]);
   const [struggles, setStruggles] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -148,6 +149,11 @@ export default function StudentDashboard() {
       .then(p => setCourses(p ?? []))
       .catch(() => setCourses([]))
       .finally(() => setLoadingCourses(false));
+
+    // Available courses catalog (fallback for unenrolled students)
+    api.courses.list()
+      .then(c => setCatalogCourses(c ?? []))
+      .catch(() => setCatalogCourses([]));
 
     // Struggles
     setLoadingStruggles(true);
@@ -263,13 +269,60 @@ export default function StudentDashboard() {
   /* Courses */
   function renderCourses() {
     if (loadingCourses) return <div className="grid sm:grid-cols-2 gap-4"><Skeleton h="h-32" /><Skeleton h="h-32" /></div>;
-    if (!courses?.length) return (
-      <EmptyState 
-        title="No enrolled courses"
-        message="You haven't enrolled in any courses yet. Browse courses to get started."
-        action={<Link to="/courses" className="px-5 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800 transition-colors inline-block font-medium">Browse Courses</Link>}
-      />
-    );
+    if (!courses?.length) {
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-stone-800">Available Courses</p>
+              <p className="text-xs text-stone-500">You are not enrolled in any courses yet. Choose a course to begin learning:</p>
+            </div>
+            <Link to="/courses" className="text-xs font-semibold text-teal-700 hover:text-teal-800 flex items-center gap-1">
+              Browse All <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          {catalogCourses?.length > 0 ? (
+            <div className="grid sm:grid-cols-2 gap-4">
+              {catalogCourses.slice(0, 4).map(c => (
+                <div key={c.id} className="bg-[var(--card-bg)] p-5 rounded-xl border border-[var(--border)] shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <h4 className="font-semibold text-stone-900 text-sm line-clamp-1">{c.title}</h4>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-stone-100 text-stone-600 border border-stone-200 shrink-0">
+                        {c.exam_category || "General"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-500 line-clamp-2 mb-4">{c.description || "Comprehensive syllabus and lesson series."}</p>
+                  </div>
+                  <div className="flex items-center justify-between pt-3 border-t border-stone-100">
+                    <span className="text-[11px] text-stone-400">By {c.instructor_name || "Instructor"}</span>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await api.courses.enroll(c.id);
+                          fetchAll();
+                        } catch (e) {
+                          alert(e.message);
+                        }
+                      }}
+                      className="px-3.5 py-1.5 bg-teal-700 text-white rounded-lg text-xs font-medium hover:bg-teal-800 transition-colors"
+                    >
+                      Enroll Now
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState 
+              title="No courses enrolled"
+              message="You haven't enrolled in any courses yet. Browse catalog to get started."
+              action={<Link to="/courses" className="px-5 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800 transition-colors inline-block font-medium">Browse Courses</Link>}
+            />
+          )}
+        </div>
+      );
+    }
     return (
       <div className="grid sm:grid-cols-2 gap-4">
         {courses.map((c, i) => (
