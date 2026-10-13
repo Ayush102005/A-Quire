@@ -66,6 +66,9 @@ services:
       redis:
         condition: service_healthy
     volumes:
+      - ./app:/app/app
+      - ./scripts:/app/scripts
+      - ./seed_data.json:/app/seed_data.json
       - ./firebase-credentials.json:/app/firebase-credentials.json:ro
     command: >
       sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
@@ -87,6 +90,7 @@ services:
       redis:
         condition: service_healthy
     volumes:
+      - ./app:/app/app
       - ./firebase-credentials.json:/app/firebase-credentials.json:ro
     command: celery -A app.core.celery_app worker --loglevel=info --concurrency=2
 
