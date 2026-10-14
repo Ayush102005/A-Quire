@@ -411,7 +411,12 @@ export default function MentorPanel({
     setLoadingNext(true);
   };
   
-  const handleUnderstood = () => { handleReset(); onUnderstood?.(); };
+  const handleUnderstood = () => {
+    setStage('success');
+    setPlayingId(null);
+    if (audioTimerRef.current) clearTimeout(audioTimerRef.current);
+    onUnderstood?.();
+  };
 
   const handleReset = () => {
     setStage('idle');
@@ -621,7 +626,14 @@ export default function MentorPanel({
               >
                 I am confused
               </button>
-            ) : stage !== 'success' && (
+            ) : stage === 'success' ? (
+              <div
+                id={`${id}-understood-success`}
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-lg"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Great! Continuing lesson...
+              </div>
+            ) : (
               <button
                 id={`${id}-understood-btn`}
                 data-testid={`${id}-understood-btn`}

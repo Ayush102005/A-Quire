@@ -585,6 +585,27 @@ export default function LessonPlayer() {
   };
 
   // ── Hint fetching (stored in ref) ───────────────────────────────────
+  const handleMentorUnderstood = () => {
+    setShowOverlay(false);
+    setFocusDrawerType(null);
+    if (activeTab === 'mentor') {
+      setActiveTab('transcript');
+    }
+    setMentorOpen(false);
+    setHints([]);
+    if (videoRef.current) {
+      try {
+        if (typeof videoRef.current.playVideo === 'function') {
+          videoRef.current.playVideo();
+        } else if (typeof videoRef.current.play === 'function') {
+          videoRef.current.play();
+        }
+      } catch (err) {
+        console.warn('Could not auto-resume video on understood:', err);
+      }
+    }
+  };
+
   handleGetHintRef.current = async (level = 'basic', customMsg = null, languageOverride = null) => {
     // Map MentorPanel shortcut levels → valid backend hint_level + optional
     // system-injected custom message.
@@ -1083,7 +1104,7 @@ export default function LessonPlayer() {
                 onGetHint={onGetHint}
                 onClose={() => setFocusDrawerType(null)}
                 onExpand={() => {}}
-                onUnderstood={() => setShowOverlay(false)}
+                onUnderstood={handleMentorUnderstood}
               />
             ) : (
               <div className="drawer-notes-wrapper">
@@ -1340,7 +1361,7 @@ export default function LessonPlayer() {
                     onGetHint={onGetHint}
                     onClose={() => setActiveTab('transcript')}
                     onExpand={() => {}}
-                    onUnderstood={() => { setShowOverlay(false); }}
+                    onUnderstood={handleMentorUnderstood}
                   />
                 </div>
               )}
@@ -1372,7 +1393,7 @@ export default function LessonPlayer() {
               onGetHint={onGetHint}
               onClose={() => setMentorOpen(false)}
               onExpand={() => setMentorOpen(true)}
-              onUnderstood={() => { setShowOverlay(false); }}
+              onUnderstood={handleMentorUnderstood}
             />
           </div>
 
