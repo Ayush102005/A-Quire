@@ -30,12 +30,12 @@ jobs:
 
     - name: Run Pytest
       env:
-        ENVIRONMENT: test
-        DATABASE_URL: sqlite+aiosqlite:///:memory:
-        JWT_SECRET_KEY: test-secret-key
-        FIREBASE_PROJECT_ID: test-project
-        FIREBASE_PRIVATE_KEY: test-key
-        FIREBASE_CLIENT_EMAIL: test@test.com
+        ENVIRONMENT: "test"
+        DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+        JWT_SECRET_KEY: "test-secret-key"
+        FIREBASE_PROJECT_ID: "test-project"
+        FIREBASE_PRIVATE_KEY: "test-key"
+        FIREBASE_CLIENT_EMAIL: "test@test.com"
       run: |
         pytest tests/ -v
 
@@ -70,5 +70,5 @@ jobs:
 
     - name: Build project
       env:
-        VITE_API_URL: http://localhost:8000/api/v1
+        VITE_API_URL: "http://localhost:8000/api/v1"
       run: npm run build
