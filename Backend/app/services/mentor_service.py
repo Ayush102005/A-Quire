@@ -184,7 +184,7 @@ def _invoke_claude(
         ).strip()
 
     except Exception as exc:
-        logger.error(f"Anthropic API call failed ({type(exc).__name__}): {exc}", exc_info=True)
+        logger.error(f"Anthropic API call failed: {exc}")
         return _FALLBACK_HINTS.get(hint_level, _FALLBACK_HINTS["basic"])
 
 
@@ -313,33 +313,11 @@ async def generate_hint(
         minutes, seconds = divmod(timestamp_sec, 60)
         timestamp_str = f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
 
-        transcript_context = ""
-        if struggle.lesson_id is not None and not (struggle.notes and "Transcript context" in struggle.notes):
-            lesson = await db.get(Lesson, struggle.lesson_id)
-            if lesson and lesson.transcript:
-                timestamp_float = struggle.lesson_timestamp_ms / 1000.0
-                relevant_segments = []
-                for seg in lesson.transcript:
-                    start = seg.get('start', 0.0)
-                    end = seg.get('end', start)
-                    if end >= timestamp_float - 60 and start <= timestamp_float + 60:
-                        relevant_segments.append(seg)
-                if relevant_segments:
-                    transcript_text = "\n".join(
-                        f"[{int(seg.get('start', 0)) // 60}m {int(seg.get('start', 0)) % 60}s] {seg.get('text', '')}" 
-                        for seg in relevant_segments
-                    )
-                    transcript_context = f"- Transcript context around the struggle time:\n{transcript_text}\n"
-
         activity_label = "a lesson video"
         context_block = (
             f"- Lesson topic: {lesson_title}\n"
             f"- Video position where student is stuck: {timestamp_str} ({struggle.lesson_timestamp_ms}ms)\n"
         )
-        if struggle.notes:
-            context_block += f"- Context: {struggle.notes}\n"
-        elif transcript_context:
-            context_block += transcript_context
 
     # Normalize conversation_history to plain dicts — the caller may pass
     # Pydantic ConversationTurn models (from the HTTP endpoint) or plain
