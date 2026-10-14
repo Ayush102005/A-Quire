@@ -592,7 +592,6 @@ export default function LessonPlayer() {
       setActiveTab('transcript');
     }
     setMentorOpen(false);
-    setHints([]);
     if (videoRef.current) {
       try {
         if (typeof videoRef.current.playVideo === 'function') {

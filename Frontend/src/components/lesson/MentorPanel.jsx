@@ -415,6 +415,9 @@ export default function MentorPanel({
     setStage('success');
     setPlayingId(null);
     if (audioTimerRef.current) clearTimeout(audioTimerRef.current);
+    setTimeout(() => {
+      setStage('idle');
+    }, 2000);
     onUnderstood?.();
   };
 
