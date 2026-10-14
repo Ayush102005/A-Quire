@@ -68,7 +68,16 @@ export default function TranscriptPanel({ segments, currentTime, onSeek, lang = 
         className="relative overflow-y-auto flex-1 py-3 px-2 space-y-1 scroll-smooth bg-surface"
         aria-label="Lesson transcript"
       >
-        {segments.map((seg) => {
+        {(!segments || segments.length === 0) ? (
+          <div className="flex flex-col items-center justify-center h-full min-h-[220px] p-6 text-center">
+            <Clock className="w-8 h-8 mb-2 opacity-30 text-stone-400" />
+            <p className="text-sm font-semibold text-stone-700 dark:text-stone-300">Transcript unavailable</p>
+            <p className="text-xs text-stone-400 dark:text-stone-500 mt-1 max-w-xs leading-relaxed">
+              Subtitles have not been generated or are not available for this video yet.
+            </p>
+          </div>
+        ) : (
+          segments.map((seg) => {
           const isActive = seg.id === activeId;
           return (
             <button
@@ -102,7 +111,7 @@ export default function TranscriptPanel({ segments, currentTime, onSeek, lang = 
               </p>
             </button>
           );
-        })}
+        }))}
       </div>
     </div>
   );
