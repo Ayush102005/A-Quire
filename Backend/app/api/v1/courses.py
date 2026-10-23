@@ -391,7 +391,7 @@ async def fetch_transcript(
     return lesson
 
 @router.get("/lessons/{lesson_id}/transcript", response_model=list[dict],
-             summary="Fetch actual transcript for a YouTube video lesson in a specific language dynamically")
+             summary="Fetch transcript, optionally translated. Falls back to DB-cached transcript on cloud IP blocks.")
 async def get_translated_transcript(
     lesson_id: int,
     lang: str = "en",
@@ -399,21 +399,45 @@ async def get_translated_transcript(
     db: AsyncSession = Depends(get_db),
     _rl: None = rate_limit(30, 60),
 ) -> list[dict]:
+    import logging
+    _logger = logging.getLogger(__name__)
     lesson = await _load_lesson_with_course(db, lesson_id)
-    # Check if student is enrolled or user is instructor (already checked by existing logic in course/lesson loading maybe? Actually we just need to return the transcript)
-    
-    if not lesson.video_url:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Lesson has no video URL.")
-        
-    try:
-        transcript = fetch_youtube_transcript(lesson.video_url, target_lang=lang)
-    except Exception as e:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Could not fetch transcript in language {lang}: {str(e)}")
-        
-    if not transcript:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Could not fetch transcript. Make sure the URL is a valid YouTube video with closed captions.")
-        
-    return transcript
+
+    # Fast path: "original" language or English requested with a cached transcript.
+    # Return whatever is stored in the DB to avoid any live YouTube network call.
+    # On AWS EC2 (and other cloud/datacenter IPs), YouTube blocks all live
+    # transcript API requests — the DB-cached version is the only reliable source.
+    if lang in ("original", "en") and lesson.transcript:
+        return lesson.transcript
+
+    # For non-English translations, attempt a live YouTube fetch.
+    # This WILL fail on cloud IPs without a proxy — the except block below
+    # logs a warning and falls through to the DB fallback instead of erroring.
+    live_transcript = None
+    if lesson.video_url:
+        try:
+            live_transcript = fetch_youtube_transcript(lesson.video_url, target_lang=lang)
+        except Exception as exc:
+            _logger.warning(
+                "Live YouTube transcript fetch failed for lesson %s lang=%s: %s — falling back to DB cache",
+                lesson_id, lang, exc,
+            )
+
+    if live_transcript:
+        return live_transcript
+
+    # Fallback: return the DB-cached transcript (usually English even if a
+    # different language was requested — still better than an empty panel).
+    if lesson.transcript:
+        return lesson.transcript
+
+    raise HTTPException(
+        status.HTTP_404_NOT_FOUND,
+        detail=(
+            "No transcript available for this lesson. "
+            "Ask the instructor to fetch the transcript from the course editor."
+        ),
+    )
 
 
 @router.post("/lessons/{lesson_id}/pdf", response_model=LessonResponse,
