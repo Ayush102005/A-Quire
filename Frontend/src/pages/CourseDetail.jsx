@@ -80,20 +80,13 @@ export default function CourseDetail() {
             const p = progressByLessonId.get(l.id);
             return {
               ...l,
-              state: p?.is_completed ? 'completed' : (p?.watched_seconds > 0 ? 'in-progress' : 'locked'),
+              state: p?.is_completed ? 'completed' : (p?.watched_seconds > 0 ? 'in-progress' : 'unlocked'),
               watched_seconds: p?.watched_seconds ?? 0,
               completion_percent: p?.completion_percent ?? 0,
               weakTopic: false,
             };
           }),
         }));
-        let prevCompleted = true;
-        mergedModules.forEach(m => {
-          m.lessons.forEach(l => {
-            if (prevCompleted && l.state === 'locked') l.state = 'unlocked';
-            prevCompleted = l.state === 'completed';
-          });
-        });
         setModules(mergedModules);
         setLoading(false);
       } catch (err) {

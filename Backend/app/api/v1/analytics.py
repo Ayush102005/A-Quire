@@ -47,13 +47,34 @@ async def student_summary(
         )
     ) or 0
 
-    # Average completion across all tracked lessons
-    avg_completion = await db.scalar(
-        select(func.avg(Progress.completion_percent)).where(
-            Progress.user_id == current_user.id
-        )
+    # Average completion across ALL lessons in enrolled courses
+    # (unstarted lessons count as 0%, not excluded)
+    enrolled_course_ids_result = await db.execute(
+        select(Enrollment.course_id).where(Enrollment.user_id == current_user.id)
     )
-    avg_completion = round(float(avg_completion or 0.0), 1)
+    enrolled_course_ids = [r[0] for r in enrolled_course_ids_result.all()]
+
+    if enrolled_course_ids:
+        total_lesson_ids_result = await db.execute(
+            select(Lesson.id)
+            .join(Module, Module.id == Lesson.module_id)
+            .where(Module.course_id.in_(enrolled_course_ids))
+        )
+        all_lesson_ids = [r[0] for r in total_lesson_ids_result.all()]
+        total_lesson_count = len(all_lesson_ids)
+
+        if total_lesson_count > 0:
+            progress_sum = await db.scalar(
+                select(func.sum(Progress.completion_percent)).where(
+                    Progress.user_id == current_user.id,
+                    Progress.lesson_id.in_(all_lesson_ids),
+                )
+            ) or 0.0
+            avg_completion = round(float(progress_sum) / total_lesson_count, 1)
+        else:
+            avg_completion = 0.0
+    else:
+        avg_completion = 0.0
 
     # Total struggle events
     struggle_count = await db.scalar(
