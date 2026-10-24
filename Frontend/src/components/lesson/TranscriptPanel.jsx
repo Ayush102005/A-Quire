@@ -9,6 +9,7 @@ function formatTime(seconds) {
 
 export default function TranscriptPanel({ segments, currentTime, onSeek, lang = 'original', onLangChange, isLoading = false }) {
   const activeRef = useRef(null);
+  const containerRef = useRef(null);
 
   // Find active segment with fallback for gaps between segments
   const activeId = (() => {
@@ -20,18 +21,17 @@ export default function TranscriptPanel({ segments, currentTime, onSeek, lang = 
     return fallbackIdx >= 0 ? segments[fallbackIdx].id : null;
   })();
 
-  // Auto-scroll to active segment
+  // Auto-scroll to the active segment.
+  // Uses a containerRef directly on the scrollable div to avoid the
+  // `parentElement` lookup bug that fires when React renders fragments
+  // or when the button is wrapped in extra DOM nodes.
   useEffect(() => {
-    if (activeRef.current) {
-      const container = activeRef.current.parentElement;
-      if (container) {
-        // Calculate position to center the active item in the container
-        const top = activeRef.current.offsetTop - (container.clientHeight / 2) + (activeRef.current.clientHeight / 2);
-        container.scrollTo({
-          top: top,
-          behavior: 'smooth'
-        });
-      }
+    if (activeRef.current && containerRef.current) {
+      const container = containerRef.current;
+      const item = activeRef.current;
+      // Center the active item vertically within the container
+      const top = item.offsetTop - container.clientHeight / 2 + item.clientHeight / 2;
+      container.scrollTo({ top, behavior: 'smooth' });
     }
   }, [activeId]);
 
@@ -48,8 +48,8 @@ export default function TranscriptPanel({ segments, currentTime, onSeek, lang = 
           Interactive Transcript
         </h2>
         {onLangChange && (
-          <select 
-            value={lang} 
+          <select
+            value={lang}
             onChange={(e) => onLangChange(e.target.value)}
             className="text-xs bg-surface-soft border border-border rounded px-2 py-1 outline-none focus:ring-1 focus:ring-primary"
             aria-label="Select transcript language"
@@ -65,6 +65,7 @@ export default function TranscriptPanel({ segments, currentTime, onSeek, lang = 
       </div>
 
       <div
+        ref={containerRef}
         className="relative overflow-y-auto flex-1 py-3 px-2 space-y-1 scroll-smooth bg-surface"
         aria-label="Lesson transcript"
       >
@@ -78,40 +79,41 @@ export default function TranscriptPanel({ segments, currentTime, onSeek, lang = 
           </div>
         ) : (
           segments.map((seg) => {
-          const isActive = seg.id === activeId;
-          return (
-            <button
-              key={seg.id}
-              ref={isActive ? activeRef : null}
-              onClick={() => onSeek(seg.start)}
-              className={`w-full text-left flex gap-3 px-3 py-2.5 rounded-xl transition-all group focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
-                isActive
-                  ? 'bg-indigo-50 border border-indigo-100 shadow-sm'
-                  : 'hover:bg-surface-soft border border-transparent'
-              }`}
-              aria-current={isActive ? 'true' : undefined}
-              aria-label={`Jump to ${formatTime(seg.start)}: ${seg.text}`}
-            >
-              {/* Timestamp */}
-              <span
-                className={`text-xs font-mono tabular-nums pt-0.5 shrink-0 transition-colors ${
-                  isActive ? 'text-primary font-bold' : 'text-muted group-hover:text-text'
+            const isActive = seg.id === activeId;
+            return (
+              <button
+                key={seg.id}
+                ref={isActive ? activeRef : null}
+                onClick={() => onSeek(seg.start)}
+                className={`w-full text-left flex gap-3 px-3 py-2.5 rounded-xl transition-all group focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
+                  isActive
+                    ? 'bg-indigo-50 border border-indigo-100 shadow-sm'
+                    : 'hover:bg-surface-soft border border-transparent'
                 }`}
+                aria-current={isActive ? 'true' : undefined}
+                aria-label={`Jump to ${formatTime(seg.start)}: ${seg.text}`}
               >
-                {formatTime(seg.start)}
-              </span>
+                {/* Timestamp */}
+                <span
+                  className={`text-xs font-mono tabular-nums pt-0.5 shrink-0 transition-colors ${
+                    isActive ? 'text-primary font-bold' : 'text-muted group-hover:text-text'
+                  }`}
+                >
+                  {formatTime(seg.start)}
+                </span>
 
-              {/* Text */}
-              <p
-                className={`text-sm leading-relaxed transition-colors ${
-                  isActive ? 'text-text font-medium' : 'text-muted group-hover:text-text'
-                }`}
-              >
-                {seg.text}
-              </p>
-            </button>
-          );
-        }))}
+                {/* Text */}
+                <p
+                  className={`text-sm leading-relaxed transition-colors ${
+                    isActive ? 'text-text font-medium' : 'text-muted group-hover:text-text'
+                  }`}
+                >
+                  {seg.text}
+                </p>
+              </button>
+            );
+          })
+        )}
       </div>
     </div>
   );
