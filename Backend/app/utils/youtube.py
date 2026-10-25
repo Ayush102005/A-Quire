@@ -87,11 +87,14 @@ def fetch_youtube_transcript(url: str, target_lang: str = 'en') -> list[dict] | 
                 # If 'original', just get the first available
                 transcript = next(iter(transcript_list_obj))
         except Exception:
-            # If requested language not found, get the first available transcript and translate
+            # If requested language not found, get the first available transcript and try translating
             try:
                 transcript = next(iter(transcript_list_obj))
                 if target_lang and target_lang != 'original' and transcript.is_translatable:
-                    transcript = transcript.translate(target_lang)
+                    try:
+                        transcript = transcript.translate(target_lang)
+                    except Exception as trans_err:
+                        logger.warning(f"Could not translate transcript to {target_lang}: {trans_err}. Using original transcript.")
             except Exception:
                 raise NoTranscriptFound(video_id)
                 
