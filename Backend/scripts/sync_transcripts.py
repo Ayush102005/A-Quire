@@ -39,8 +39,19 @@ async def sync():
             lesson = await session.scalar(select(Lesson).where(Lesson.id == row["id"]))
             if lesson:
                 lesson.transcript = t
+                if row.get("video_url"):
+                    lesson.video_url = row["video_url"]
+                if row.get("title"):
+                    lesson.title = row["title"]
                 updated += 1
                 print(f"[+] Updated Lesson {lesson.id} ({lesson.title}) with {len(t)} segments")
+
+        from app.models.course import Module
+        for mod_row in data.get("modules", []):
+            mod = await session.scalar(select(Module).where(Module.id == mod_row["id"]))
+            if mod and mod_row.get("title"):
+                mod.title = mod_row["title"]
+                print(f"[+] Updated Module {mod.id} ({mod.title})")
         
         await session.commit()
         print(f"[SUCCESS] Synced transcripts for {updated} lessons!")
