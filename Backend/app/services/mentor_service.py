@@ -42,7 +42,9 @@ _HINT_LEVEL_INSTRUCTIONS: dict[str, str] = {
     "basic": (
         "Provide a SHORT, gentle nudge (2-3 sentences). "
         "Do NOT reveal the answer. Guide the student to look at the right part of the concept. "
-        "Use simple vocabulary. Focus on the first sub-step they should try."
+        "Use simple vocabulary. Focus on the first sub-step they should try. "
+        "If a transcript excerpt is provided, refer directly to the concept being explained in it "
+        "rather than asking the student which screen or topic they are on."
     ),
     "detailed": (
         "Provide a DETAILED explanation (4-6 sentences). "
@@ -56,7 +58,10 @@ _HINT_LEVEL_INSTRUCTIONS: dict[str, str] = {
     ),
     "custom": (
         "The student has a specific question or request (see below) — address it directly and "
-        "helpfully, in the context of the lesson. Do NOT ignore it in favor of a generic hint."
+        "helpfully, in the context of the lesson. If the student asks what is being taught or asks "
+        "you to explain the screen/concept, explain the exact concept from the transcript excerpt "
+        "in clear, easy-to-understand terms. Do not ask them what is on screen when the transcript "
+        "excerpt is available."
     ),
 }
 
@@ -318,30 +323,45 @@ async def generate_hint(
 
         # Extract transcript window around the struggle timestamp so Claude
         # knows EXACTLY what concept is on screen (not just the lesson title).
-        # Without this, Claude guesses based on title alone and produces
-        # irrelevant hints (e.g. explaining functional dependency when the
-        # student is watching an Entity slide).
-        # Window: segments within +-45 s of the stuck position.
         transcript_context = ""
+        window_text = ""
+
+        # 1. First attempt: match from lesson.transcript in database
         if lesson is not None and lesson.transcript:
-            ts_ms = struggle.lesson_timestamp_ms
-            window_ms = 45_000  # +-45 seconds
-            window_segments = [
-                seg for seg in lesson.transcript
-                if isinstance(seg, dict)
-                and (seg.get("start", 0) * 1000) >= max(0, ts_ms - window_ms)
-                and (seg.get("start", 0) * 1000) <= ts_ms + window_ms
-            ]
-            if window_segments:
+            ts_ms = struggle.lesson_timestamp_ms or 0
+            ts_sec = ts_ms / 1000.0 if ts_ms > 1000 else float(ts_ms)
+            window_sec = 60.0  # +-60 seconds around current playback
+            matching_segments = []
+            for seg in lesson.transcript:
+                if not isinstance(seg, dict):
+                    continue
+                start_val = seg.get("start", 0.0)
+                end_val = seg.get("end", start_val + 10.0)
+                seg_start = start_val / 1000.0 if start_val > 100000 else float(start_val)
+                seg_end = end_val / 1000.0 if end_val > 100000 else float(end_val)
+                if seg_start <= (ts_sec + window_sec) and seg_end >= max(0.0, ts_sec - window_sec):
+                    matching_segments.append(seg)
+
+            if matching_segments:
                 window_text = " ".join(
                     seg.get("text", "").strip()
-                    for seg in window_segments
+                    for seg in matching_segments
                     if seg.get("text", "").strip()
                 )
-                transcript_context = (
-                    "- What is being explained at this moment (transcript excerpt):\n"
-                    "  \"" + window_text + "\"\n"
-                )
+
+        # 2. Fallback: check struggle.notes (sent directly by the frontend's struggle monitor)
+        if not window_text and struggle.notes:
+            notes_str = struggle.notes.strip()
+            if "Transcript context:" in notes_str:
+                window_text = notes_str.split("Transcript context:", 1)[1].strip()
+
+        if window_text:
+            transcript_context = (
+                "- What is being explained at this exact moment (transcript excerpt):\n"
+                "  \"" + window_text + "\"\n"
+                "IMPORTANT TUTOR INSTRUCTION: Ground your answer directly in the concept mentioned in this transcript excerpt. "
+                "Do not speculate on unrelated topics or ask the student what is on screen.\n"
+            )
 
         context_block = (
             "- Lesson topic: " + lesson_title + "\n"
