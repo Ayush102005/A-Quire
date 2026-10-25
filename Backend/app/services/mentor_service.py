@@ -303,7 +303,8 @@ async def generate_hint(
     else:
         # Falls back to a generic label if the lesson was deleted or
         # lesson_id is unset.
-        lesson_title = f"Lesson #{struggle.lesson_id}"
+        lesson_title = "Lesson #" + str(struggle.lesson_id)
+        lesson = None
         if struggle.lesson_id is not None:
             lesson = await db.get(Lesson, struggle.lesson_id)
             if lesson is not None and lesson.title:
@@ -311,12 +312,41 @@ async def generate_hint(
 
         timestamp_sec = struggle.lesson_timestamp_ms // 1000
         minutes, seconds = divmod(timestamp_sec, 60)
-        timestamp_str = f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
+        timestamp_str = (str(minutes) + "m " + str(seconds) + "s") if minutes else (str(seconds) + "s")
 
         activity_label = "a lesson video"
+
+        # Extract transcript window around the struggle timestamp so Claude
+        # knows EXACTLY what concept is on screen (not just the lesson title).
+        # Without this, Claude guesses based on title alone and produces
+        # irrelevant hints (e.g. explaining functional dependency when the
+        # student is watching an Entity slide).
+        # Window: segments within +-45 s of the stuck position.
+        transcript_context = ""
+        if lesson is not None and lesson.transcript:
+            ts_ms = struggle.lesson_timestamp_ms
+            window_ms = 45_000  # +-45 seconds
+            window_segments = [
+                seg for seg in lesson.transcript
+                if isinstance(seg, dict)
+                and (seg.get("start", 0) * 1000) >= max(0, ts_ms - window_ms)
+                and (seg.get("start", 0) * 1000) <= ts_ms + window_ms
+            ]
+            if window_segments:
+                window_text = " ".join(
+                    seg.get("text", "").strip()
+                    for seg in window_segments
+                    if seg.get("text", "").strip()
+                )
+                transcript_context = (
+                    "- What is being explained at this moment (transcript excerpt):\n"
+                    "  \"" + window_text + "\"\n"
+                )
+
         context_block = (
-            f"- Lesson topic: {lesson_title}\n"
-            f"- Video position where student is stuck: {timestamp_str} ({struggle.lesson_timestamp_ms}ms)\n"
+            "- Lesson topic: " + lesson_title + "\n"
+            "- Video position where student is stuck: " + timestamp_str + " (" + str(struggle.lesson_timestamp_ms) + "ms)\n"
+            + transcript_context
         )
 
     # Normalize conversation_history to plain dicts — the caller may pass
