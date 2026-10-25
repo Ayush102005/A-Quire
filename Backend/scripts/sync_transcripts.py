@@ -46,7 +46,7 @@ async def sync():
                 updated += 1
                 print(f"[+] Updated Lesson {lesson.id} ({lesson.title}) with {len(t)} segments")
 
-        from app.models.course import Module
+        from app.models.module import Module
         for mod_row in data.get("modules", []):
             mod = await session.scalar(select(Module).where(Module.id == mod_row["id"]))
             if mod and mod_row.get("title"):
