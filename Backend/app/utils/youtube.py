@@ -9,31 +9,32 @@ logger = logging.getLogger(__name__)
 
 def _build_api() -> YouTubeTranscriptApi:
     """
-    Without a proxy, YouTube frequently blocks transcript requests from
-    cloud/datacenter IPs (AWS, GCP, Azure, ...) — a well-documented
-    limitation of this library, not something fixable in this code alone
-    (confirmed directly: requests from this project's own EC2 instance hit
-    exactly this block). WEBSHARE_PROXY_* settings are optional — unset,
-    this behaves exactly as before (works fine from a residential IP like
-    local dev; degrades to "no transcript" from cloud hosting).
-
-    Uses GenericProxyConfig pointed at one specific dedicated proxy from
-    the account's Proxy List, not youtube_transcript_api's WebshareProxyConfig
-    — that class targets Webshare's *rotating* gateway (p.webshare.io:80),
-    which returns 407 ("not in your list") on the $2.99/mo 100-shared-proxy
-    plan actually in use here (confirmed directly) — that gateway needs a
-    higher tier. The dedicated proxies from the same plan work fine
-    individually, just without automatic rotation across them.
+    Build YouTubeTranscriptApi configured with a proxy if settings are provided.
+    If WEBSHARE_PROXY_HOST is 'p.webshare.io' (or unset/empty when username & password
+    are given), uses WebshareProxyConfig to rotate through Webshare's proxy pool with
+    automatic retries when YouTube blocks an IP.
+    Otherwise, uses GenericProxyConfig pointing to the specified proxy host and port.
     """
-    if settings.WEBSHARE_PROXY_USERNAME and settings.WEBSHARE_PROXY_PASSWORD and settings.WEBSHARE_PROXY_HOST:
-        from youtube_transcript_api.proxies import GenericProxyConfig
-        proxy_url = (
-            f"http://{settings.WEBSHARE_PROXY_USERNAME}:{settings.WEBSHARE_PROXY_PASSWORD}"
-            f"@{settings.WEBSHARE_PROXY_HOST}:{settings.WEBSHARE_PROXY_PORT}/"
-        )
-        return YouTubeTranscriptApi(
-            proxy_config=GenericProxyConfig(http_url=proxy_url, https_url=proxy_url)
-        )
+    if settings.WEBSHARE_PROXY_USERNAME and settings.WEBSHARE_PROXY_PASSWORD:
+        host = (settings.WEBSHARE_PROXY_HOST or "").strip()
+        if not host or host == "p.webshare.io":
+            from youtube_transcript_api.proxies import WebshareProxyConfig
+            return YouTubeTranscriptApi(
+                proxy_config=WebshareProxyConfig(
+                    proxy_username=settings.WEBSHARE_PROXY_USERNAME,
+                    proxy_password=settings.WEBSHARE_PROXY_PASSWORD,
+                    retries_when_blocked=10,
+                )
+            )
+        else:
+            from youtube_transcript_api.proxies import GenericProxyConfig
+            proxy_url = (
+                f"http://{settings.WEBSHARE_PROXY_USERNAME}:{settings.WEBSHARE_PROXY_PASSWORD}"
+                f"@{host}:{settings.WEBSHARE_PROXY_PORT}/"
+            )
+            return YouTubeTranscriptApi(
+                proxy_config=GenericProxyConfig(http_url=proxy_url, https_url=proxy_url)
+            )
     return YouTubeTranscriptApi()
 
 def extract_video_id(url: str) -> str | None:
