@@ -211,9 +211,21 @@ export default function LessonPlayer() {
   const wsRef = useRef(null);
   const lessonRef = useRef(null);             // always-current lesson (avoids stale closures)
   const struggleEventIdRef = useRef(null);    // always-current event ID
-  // Function refs — reassigned each render so callbacks always call the latest version
   const detectStruggleRef = useRef(null);
   const handleGetHintRef = useRef(null);
+
+  const pauseVideo = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      if (typeof video.pauseVideo === 'function') {
+        video.pauseVideo();
+      } else if (typeof video.pause === 'function') {
+        video.pause();
+      }
+    } catch (_) {}
+    setIsPlaying(false);
+  }, []);
 
   // Auto-struggle budget gate — see refs above. Manual triggers don't consume
   // the budget but do restart the cooldown, so an auto-trigger can't fire
@@ -428,6 +440,8 @@ export default function LessonPlayer() {
             }
             setShowOverlay(false);
             setMentorOpen(true);
+            // Once we get the hint from WebSocket, pause the video!
+            pauseVideo();
           }
         },
         // onError
@@ -572,8 +586,16 @@ export default function LessonPlayer() {
           setIsAutoDetected(false); // user asked — not system-detected
           setMentorOpen(true);
         } else {
-          setIsAutoDetected(true);  // system detected — show amber banner
-          setShowOverlay(true);
+          setIsAutoDetected(true);  // system detected
+          setShowOverlay(false);    // Do NOT show blocking question modal asking the user
+          setMentorOpen(true);      // Open mentor panel immediately
+          setActiveTab('mentor');   // On tabbed layout, switch to mentor tab
+          if (isFocusMode) {
+            setFocusDrawerType('mentor');
+          }
+          // Automatically generate the hint in the background without asking!
+          // Video continues playing until the hint actually arrives.
+          handleGetHintRef.current?.('basic');
         }
       } else if (isManual) {
         // Manual trigger always opens mentor even without a detected event
@@ -659,6 +681,8 @@ export default function LessonPlayer() {
             audio_base64: result.audio_base64 
           }];
         });
+        // Once we get the hint from the API, pause the video!
+        pauseVideo();
       }
     } catch (_) { /* silent */ } finally {
       setHintLoading(false);
@@ -683,6 +707,22 @@ export default function LessonPlayer() {
       } else {
         videoRef.current.currentTime = time;
       }
+    }
+  }, []);
+
+  const handleReplay30s = useCallback(() => {
+    const seekTo = Math.max(0, currentTimeRef.current - 30);
+    if (videoRef.current?.seekTo) {
+      videoRef.current.seekTo(seekTo, true);
+    } else if (videoRef.current) {
+      videoRef.current.currentTime = seekTo;
+    }
+    if (videoRef.current) {
+      try {
+        if (typeof videoRef.current.playVideo === 'function') videoRef.current.playVideo();
+        else if (typeof videoRef.current.play === 'function') videoRef.current.play();
+      } catch (_) {}
+      setIsPlaying(true);
     }
   }, []);
 
@@ -1095,7 +1135,7 @@ export default function LessonPlayer() {
                 id="focus-mentor-panel"
                 isDrawer={true}
                 isOpen={true}
-                isStruggle={showOverlay}
+                isStruggle={isAutoDetected || showOverlay}
                 isAutoDetected={isAutoDetected}
                 reasonText={struggleReasonText}
                 hints={hints}
@@ -1104,6 +1144,7 @@ export default function LessonPlayer() {
                 onClose={() => setFocusDrawerType(null)}
                 onExpand={() => {}}
                 onUnderstood={handleMentorUnderstood}
+                onReplay={handleReplay30s}
               />
             ) : (
               <div className="drawer-notes-wrapper">
@@ -1352,7 +1393,7 @@ export default function LessonPlayer() {
                 <div className="h-full mentor-chat" id="mentor-panel">
                   <MentorPanel
                     isOpen={true}
-                    isStruggle={showOverlay}
+                    isStruggle={isAutoDetected || showOverlay}
                     isAutoDetected={isAutoDetected}
                     reasonText={struggleReasonText}
                     hints={hints}
@@ -1361,6 +1402,7 @@ export default function LessonPlayer() {
                     onClose={() => setActiveTab('transcript')}
                     onExpand={() => {}}
                     onUnderstood={handleMentorUnderstood}
+                    onReplay={handleReplay30s}
                   />
                 </div>
               )}
@@ -1384,7 +1426,7 @@ export default function LessonPlayer() {
           <div className="hidden sm:flex flex-col gap-3 mentor-chat" id="mentor-panel">
             <MentorPanel
               isOpen={mentorOpen}
-              isStruggle={showOverlay}
+              isStruggle={isAutoDetected || showOverlay}
               isAutoDetected={isAutoDetected}
               reasonText={struggleReasonText}
               hints={hints}
@@ -1393,6 +1435,7 @@ export default function LessonPlayer() {
               onClose={() => setMentorOpen(false)}
               onExpand={() => setMentorOpen(true)}
               onUnderstood={handleMentorUnderstood}
+              onReplay={handleReplay30s}
             />
           </div>
 

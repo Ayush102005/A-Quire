@@ -239,6 +239,7 @@ export default function MentorPanel({
   onClose, 
   onExpand, 
   onUnderstood,
+  onReplay,
   // The real reason this was auto-detected (see
   // InterventionOverlay.jsx's getStruggleReasonText) — null falls back to
   // the generic copy below, same as before this existed.
@@ -507,6 +508,18 @@ export default function MentorPanel({
 
           {/* ── Empty state / Context card ──────────────────────────────── */}
           {hints.length === 0 ? (
+            hintLoading ? (
+              <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 p-4 animate-pulse">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-500 animate-spin" />
+                  <span className="text-xs font-bold uppercase tracking-wider">AI Mentor Generating Hint</span>
+                </div>
+                <p className="text-xs leading-relaxed text-stone-600 dark:text-stone-300">
+                  {reasonText ? `We noticed ${reasonText}. ` : 'We noticed you might be finding this section tricky. '}
+                  Analyzing the lesson concept at this moment to prepare guidance for you...
+                </p>
+              </div>
+            ) : (
             <div 
               id={`${id}-empty-card`}
               data-testid={`${id}-empty-card`}
@@ -554,6 +567,7 @@ export default function MentorPanel({
                 </button>
               </div>
             </div>
+            )
           ) : isAutoDetected ? (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-200 overflow-hidden">
               <div className="px-4 pt-3 pb-3">
@@ -615,37 +629,74 @@ export default function MentorPanel({
         
         {/* Quick Actions */}
         {!(loadingNext || hintLoading) && (
-          <div id={`${id}-quick-actions`} data-testid={`${id}-quick-actions`} className="flex gap-2">
-            {mentorHints.length === 0 ? (
-              <button
-                id={`${id}-confused-btn`}
-                data-testid={`${id}-confused-btn`}
-                onClick={() => triggerHint('confused')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                  isDrawer
-                    ? 'text-stone-300 bg-stone-800/80 hover:bg-stone-700/80 border border-stone-700'
-                    : 'text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800'
-                }`}
-              >
-                I am confused
-              </button>
-            ) : stage === 'success' ? (
-              <div
-                id={`${id}-understood-success`}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-lg"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Great! Continuing lesson...
+          <div className="space-y-2">
+            {mentorHints.length > 0 && stage !== 'success' && (
+              <div className="flex flex-wrap gap-1.5 justify-center">
+                {onReplay && (
+                  <button
+                    type="button"
+                    onClick={onReplay}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-full bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="w-3 h-3 text-stone-400" /> Replay 30s
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => triggerHint('simpler')}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-full bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 transition-colors cursor-pointer"
+                >
+                  <Lightbulb className="w-3 h-3 text-amber-500" /> Explain simply
+                </button>
+                <button
+                  type="button"
+                  onClick={() => triggerHint('example')}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-full bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 transition-colors cursor-pointer"
+                >
+                  <BookOpen className="w-3 h-3 text-teal-500" /> Worked example
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onGetHint?.('detailed', null, 'hinglish')}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-full bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 transition-colors cursor-pointer"
+                >
+                  <Sparkles className="w-3 h-3 text-indigo-500" /> In Hinglish
+                </button>
               </div>
-            ) : (
-              <button
-                id={`${id}-understood-btn`}
-                data-testid={`${id}-understood-btn`}
-                onClick={handleUnderstood}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/50 border border-teal-200 dark:border-teal-800 rounded-lg hover:bg-teal-100 dark:hover:bg-teal-900/60 transition-colors cursor-pointer"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 text-teal-500" /> I understood — continue lesson
-              </button>
             )}
+
+            <div id={`${id}-quick-actions`} data-testid={`${id}-quick-actions`} className="flex gap-2">
+              {mentorHints.length === 0 ? (
+                <button
+                  id={`${id}-confused-btn`}
+                  data-testid={`${id}-confused-btn`}
+                  onClick={() => triggerHint('confused')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                    isDrawer
+                      ? 'text-stone-300 bg-stone-800/80 hover:bg-stone-700/80 border border-stone-700'
+                      : 'text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800'
+                  }`}
+                >
+                  I am confused
+                </button>
+              ) : stage === 'success' ? (
+                <div
+                  id={`${id}-understood-success`}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-lg"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Great! Continuing lesson...
+                </div>
+              ) : (
+                <button
+                  id={`${id}-understood-btn`}
+                  data-testid={`${id}-understood-btn`}
+                  onClick={handleUnderstood}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/50 border border-teal-200 dark:border-teal-800 rounded-lg hover:bg-teal-100 dark:hover:bg-teal-900/60 transition-colors cursor-pointer"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-teal-500" /> I understood — continue lesson
+                </button>
+              )}
+            </div>
           </div>
         )}
 

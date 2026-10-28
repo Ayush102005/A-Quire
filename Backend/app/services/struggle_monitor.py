@@ -9,6 +9,8 @@ from fastapi import BackgroundTasks
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.lesson import Lesson
+from app.models.module import Module
 from app.models.mentor_intervention import MentorIntervention
 from app.models.struggle_event import StruggleEvent
 from app.schemas.struggle_monitor import (
@@ -241,9 +243,15 @@ async def monitor_learning_activity(
         context_type=input_data.context_type,
     )
 
+    resolved_course_id = input_data.course_id
+    if not resolved_course_id and input_data.lesson_id:
+        resolved_course_id = await db.scalar(
+            select(Module.course_id).join(Lesson, Lesson.module_id == Module.id).where(Lesson.id == input_data.lesson_id)
+        )
+
     event_payload = StruggleEventCreate(
         student_id=input_data.student_id,
-        course_id=input_data.course_id,
+        course_id=resolved_course_id,
         lesson_id=input_data.lesson_id,
         problem_id=input_data.problem_id,
         event_type=input_data.event_type or event_type,

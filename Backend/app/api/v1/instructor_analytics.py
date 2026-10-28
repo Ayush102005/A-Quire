@@ -9,7 +9,7 @@ import datetime
 from typing import Optional, List, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func, and_, desc, or_, text, Integer
+from sqlalchemy import select, func, and_, desc, asc, or_, text, Integer
 from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
@@ -185,7 +185,13 @@ async def get_priority_queue(
      .join(QuizSession, QuizResponse.session_id == QuizSession.id)\
      .where(QuizSession.course_id == course_id)\
      .group_by(Topic.name)\
-     .having(and_(func.count(QuizResponse.id) >= 10, func.avg(func.cast(QuizResponse.is_correct, Integer)) < 0.6))
+     .having(
+         or_(
+             and_(func.count(QuizResponse.id) >= 1, func.avg(func.cast(QuizResponse.is_correct, Integer)) == 0.0),
+             and_(func.count(QuizResponse.id) >= 2, func.avg(func.cast(QuizResponse.is_correct, Integer)) < 0.75)
+         )
+     )\
+     .order_by(asc('acc'), desc('attempts'))
 
     concepts = (await db.execute(concept_stmt)).all()
     for c in concepts:
@@ -193,34 +199,70 @@ async def get_priority_queue(
             type="concept_revision",
             severity="high" if c.acc < 0.4 else "medium",
             title=f"{c.name} needs revision",
-            reason=f"{int(c.acc * 100)}% accuracy across {c.attempts} attempts.",
+            reason=f"{int(c.acc * 100)}% accuracy across {c.attempts} attempt{'s' if c.attempts > 1 else ''}.",
             course_id=course_id,
             topic=c.name,
             action=QueueAction(type="open_concept", tab="concepts", topic=c.name)
         ))
 
-    # Learner follow-up
+    # Learner follow-up (Struggle events in course or course lessons)
+    lesson_subq = select(Lesson.id).join(Module, Module.id == Lesson.module_id).where(Module.course_id == course_id)
+    struggle_course_filter = or_(
+        StruggleEvent.course_id == course_id,
+        StruggleEvent.lesson_id.in_(lesson_subq)
+    )
+
     struggle_stmt = select(
         User.id,
         User.full_name,
-        func.count(StruggleEvent.id).label('count')
+        func.count(StruggleEvent.id).label('count'),
+        func.max(StruggleEvent.severity).label('max_sev')
     ).join(StruggleEvent, StruggleEvent.user_id == User.id)\
-     .where(StruggleEvent.course_id == course_id, StruggleEvent.severity >= 0.7)\
+     .where(struggle_course_filter)\
      .group_by(User.id, User.full_name)\
-     .having(func.count(StruggleEvent.id) >= 3)\
-     .order_by(desc('count'))\
+     .having(func.count(StruggleEvent.id) >= 1)\
+     .order_by(desc('count'), desc('max_sev'))\
      .limit(5)
     
+    seen_user_ids = set()
     struggling_users = (await db.execute(struggle_stmt)).all()
     for u in struggling_users:
+        seen_user_ids.add(u.id)
         queue.append(QueueItem(
             type="learner_follow_up",
-            severity="high",
+            severity="high" if (u.count >= 2 or (u.max_sev and u.max_sev >= 0.5)) else "medium",
             title=f"Check on {u.full_name}",
-            reason=f"{u.count} high-severity struggle events recently.",
+            reason=f"{u.count} struggle event{'s' if u.count > 1 else ''} detected in course lessons.",
             course_id=course_id,
             action=QueueAction(type="view_learner", tab="learners", user_id=u.id)
         ))
+
+    # Learner follow-up (Low quiz accuracy in course assessments)
+    acc_learner_stmt = select(
+        User.id,
+        User.full_name,
+        func.count(QuizResponse.id).label('attempts'),
+        func.avg(func.cast(QuizResponse.is_correct, Integer)).label('acc')
+    ).join(QuizSession, QuizSession.user_id == User.id)\
+     .join(QuizResponse, QuizResponse.session_id == QuizSession.id)\
+     .where(QuizSession.course_id == course_id)\
+     .group_by(User.id, User.full_name)\
+     .having(and_(func.count(QuizResponse.id) >= 1, func.avg(func.cast(QuizResponse.is_correct, Integer)) < 0.60))\
+     .order_by(asc('acc'))\
+     .limit(5)
+
+    low_acc_learners = (await db.execute(acc_learner_stmt)).all()
+    for u in low_acc_learners:
+        if u.id not in seen_user_ids:
+            seen_user_ids.add(u.id)
+            queue.append(QueueItem(
+                type="learner_follow_up",
+                severity="high" if u.acc < 0.4 else "medium",
+                title=f"Support {u.full_name}",
+                reason=f"Low quiz performance: {int(u.acc * 100)}% accuracy across {u.attempts} question{'s' if u.attempts > 1 else ''}.",
+                course_id=course_id,
+                action=QueueAction(type="view_learner", tab="learners", user_id=u.id)
+            ))
 
     return queue
 

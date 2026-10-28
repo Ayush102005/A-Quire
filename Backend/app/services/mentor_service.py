@@ -257,7 +257,14 @@ async def generate_hint(
 
     if not struggle:
         logger.warning(f"generate_mentor_hint: event_id={event_id} not found")
-        return "Unable to generate hint — event not found."
+        return "Unable to generate hint — event not found.", None
+
+    # If a basic hint was already generated for this struggle event (e.g. by
+    # background task _generate_auto_hint or a concurrent request) and no custom
+    # message/turn was provided, return the existing hint immediately.
+    if struggle.hint_text and hint_level == "basic" and not custom_message and not conversation_history:
+        logger.info(f"Returning cached hint for struggle event {event_id}")
+        return struggle.hint_text, None
 
     # Resolve the language to respond in: an explicit per-request override
     # (e.g. the overlay's "Ask in Hinglish" button) takes priority over the
