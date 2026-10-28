@@ -550,7 +550,22 @@ export default function LessonPlayer() {
     pauseCount = null,
   } = {}) => {
     const user = getCurrentUser();
-    if (!user || !lessonId) return;
+    if (!user || !lessonId) {
+      console.warn('[StruggleMonitor] Skipped — no user or lessonId', { user: !!user, lessonId });
+      return;
+    }
+
+    // Validate IDs before building the payload — parseInt(null/undefined) = NaN
+    // which would make the Pydantic schema reject with a 422 (silently, since the
+    // old catch block swallowed all errors).
+    const resolvedLessonId = parseInt(lessonId, 10);
+    if (isNaN(resolvedLessonId) || resolvedLessonId <= 0) {
+      console.error('[StruggleMonitor] Invalid lesson_id — skipping:', lessonId);
+      if (isManual) setMentorOpen(true);
+      return;
+    }
+    const rawCourseId = parseInt(lessonRef.current?.course_id || courseId || 1, 10);
+    const resolvedCourseId = isNaN(rawCourseId) || rawCourseId <= 0 ? undefined : rawCourseId;
 
     // Gather transcript context around current playhead
     const transcriptContext = buildTranscriptContext(transcriptItems, currentTimeRef.current);
@@ -558,30 +573,47 @@ export default function LessonPlayer() {
       s => currentTimeRef.current >= s.start && currentTimeRef.current <= (s.end ?? s.start + 9999)
     )?.id?.toString()?.slice(0, 100) ?? null;
 
+    const payload = {
+      student_id: user.id,
+      lesson_id: resolvedLessonId,
+      course_id: resolvedCourseId,
+      rewatch_count: rewatchCount ?? rewatchCountRef.current,
+      pause_count: pauseCount ?? pauseCountRef.current,
+      idle_seconds: idleSeconds,
+      completion_percent: 0,
+      failed_attempts: 0,
+      lesson_timestamp_ms: Math.round(currentTimeRef.current * 1000),
+      struggle_score: struggleScore,
+      manual_trigger: isManual,
+      inactivity_duration_ms: Math.round(idleSeconds * 1000),
+      fixation_duration_ms: Math.round(fixationMs),
+      gaze_off_screen_ms: Math.round(inactivityMs),
+      transcript_window_id: activeSegId,
+      notes: transcriptContext ? `Transcript context: ${transcriptContext}`.substring(0, 1950) : null,
+      client_event_id: `lesson-${lessonId}-${Date.now()}`,
+    };
+    console.debug('[StruggleMonitor] Calling /struggle/monitor', {
+      lessonId: payload.lesson_id,
+      courseId: payload.course_id,
+      rewatch: payload.rewatch_count,
+      pause: payload.pause_count,
+      manual: payload.manual_trigger,
+    });
+
     try {
-      const result = await api.struggles.monitor({
-        student_id: user.id,
-        lesson_id: parseInt(lessonId, 10),
-        course_id: parseInt(lessonRef.current?.course_id || courseId || 1, 10),
-        rewatch_count: rewatchCount ?? rewatchCountRef.current,
-        pause_count: pauseCount ?? pauseCountRef.current,
-        idle_seconds: idleSeconds,
-        completion_percent: 0,
-        failed_attempts: 0,
-        lesson_timestamp_ms: Math.round(currentTimeRef.current * 1000),
-        struggle_score: struggleScore,
-        manual_trigger: isManual,
-        inactivity_duration_ms: Math.round(idleSeconds * 1000),
-        fixation_duration_ms: Math.round(fixationMs),
-        gaze_off_screen_ms: Math.round(inactivityMs),
-        transcript_window_id: activeSegId,
-        notes: transcriptContext ? `Transcript context: ${transcriptContext}`.substring(0, 1950) : null,
-        client_event_id: `lesson-${lessonId}-${Date.now()}`,
-      });
+      const result = await api.struggles.monitor(payload);
       if (result?.detected && result?.event_id) {
+        // Only consume auto-struggle budget on a confirmed detected event —
+        // previously markAutoStruggleFired() was called at the call site
+        // *before* this function ran, so a failed API call (e.g. 422) still
+        // burned the budget and blocked legitimate future triggers for 60 s.
+        if (!isManual) {
+          markAutoStruggleFired();
+        }
         setStruggleEvent(result);
         setStruggleEventId(result.event_id);
         struggleEventIdRef.current = result.event_id;
+        console.debug('[StruggleMonitor] Struggle detected', { eventId: result.event_id, type: result.event_type });
         if (isManual) {
           setIsAutoDetected(false); // user asked — not system-detected
           setMentorOpen(true);
@@ -600,8 +632,14 @@ export default function LessonPlayer() {
       } else if (isManual) {
         // Manual trigger always opens mentor even without a detected event
         setMentorOpen(true);
+      } else {
+        console.debug('[StruggleMonitor] No struggle detected by backend', result?.status);
       }
-    } catch (_) {
+    } catch (err) {
+      // Previously: catch (_) — silently swallowed ALL errors including 422s,
+      // auth failures, and network errors. Students and developers had zero
+      // visibility into why struggle events were not appearing.
+      console.error('[StruggleMonitor] /struggle/monitor call failed:', err);
       if (isManual) setMentorOpen(true);
     }
   };
@@ -895,6 +933,14 @@ export default function LessonPlayer() {
         lastRewatchSegmentRef.current = newSegmentIdx >= 0 ? newSegmentIdx : null;
         lastRewatchAtMsRef.current = now;
 
+        if (rewatchCountRef.current >= 2) {
+          if (!canFireAutoStruggle()) {
+            console.debug('[StruggleMonitor] Rewatch burst blocked by budget/cooldown', {
+              count: autoStruggleCountRef.current,
+              msSinceLast: Date.now() - lastAutoStruggleAtRef.current,
+            });
+          }
+        }
         if (rewatchCountRef.current >= 2 && canFireAutoStruggle()) {
           // Captured before the re-arm reset below — detectStruggleRef's
           // body used to read rewatchCountRef.current directly, but by the
@@ -903,15 +949,17 @@ export default function LessonPlayer() {
           // regardless of the real burst size (see detectStruggleRef's own
           // comment on this).
           const firedRewatchCount = rewatchCountRef.current;
-          markAutoStruggleFired();
           // Re-arm: without this, the next rewatch to this same section
           // would also satisfy ">= 2" and re-trigger on the next cooldown
           // tick, even completely normal re-reading — this threshold is
           // meant to catch a fresh burst, not latch permanently after the
           // first one.
+          // NOTE: markAutoStruggleFired() is now called inside detectStruggleRef
+          // only after the backend confirms a detected event.
           rewatchCountRef.current = 0;
           lastRewatchToRef.current = null;
           lastRewatchSegmentRef.current = null;
+          console.debug('[StruggleMonitor] Rewatch burst — firing struggle check. rewatchCount =', firedRewatchCount);
           detectStruggleRef.current?.({ isManual: false, idleSeconds: 0, rewatchCount: firedRewatchCount });
         }
       }
@@ -1000,19 +1048,31 @@ export default function LessonPlayer() {
     lastPauseAtMsRef.current = now;
 
     // Auto-detect on pause threshold (≥2 pauses in the same section)
+    if (pauseCountRef.current >= 2) {
+      if (!canFireAutoStruggle()) {
+        console.debug('[StruggleMonitor] Pause burst blocked by budget/cooldown', {
+          count: autoStruggleCountRef.current,
+          msSinceLast: Date.now() - lastAutoStruggleAtRef.current,
+        });
+      }
+    }
     if (pauseCountRef.current >= 2 && canFireAutoStruggle()) {
       // Same capture-before-reset fix as handleTimeUpdate's rewatch check —
       // see detectStruggleRef's own comment: this used to always send 0
       // for pause_count, so the backend could never classify this as
       // "pause_frequent" and always fell back to "general_confusion".
       const firedPauseCount = pauseCountRef.current;
-      markAutoStruggleFired();
       // Re-arm — see the matching comment in handleTimeUpdate's rewatch
       // check: without this, the next pause in this same section would
       // also satisfy ">= 2" and keep re-triggering, even normal pausing.
+      // NOTE: markAutoStruggleFired() is now called inside detectStruggleRef
+      // only after the backend confirms a detected event, so a failed API
+      // call (e.g. 422 validation error) no longer burns the auto-struggle
+      // budget and blocks legitimate future triggers for 60 s.
       pauseCountRef.current = 0;
       lastPauseSegmentRef.current = null;
       lastPauseAtSecRef.current = null;
+      console.debug('[StruggleMonitor] Pause burst — firing struggle check. pauseCount =', firedPauseCount);
       detectStruggleRef.current?.({ idleSeconds: 0, pauseCount: firedPauseCount });
     }
     // Start 2-minute inactivity timer
