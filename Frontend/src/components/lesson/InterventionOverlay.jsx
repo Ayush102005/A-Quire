@@ -28,12 +28,12 @@ export function getStruggleReasonText(eventType) {
 }
 
 export function getInterventionSeverity(event) {
-  // If backend provides a score, use it (assumes scores >= 50 are High severity)
+  // Backend returns struggle_score as float 0.0-1.0 (or 0-100). Any score >= 0.15 is High severity
   if (event?.struggle_score !== undefined && event?.struggle_score !== null) {
-    return event.struggle_score >= 50 ? 'high' : 'low';
+    return (event.struggle_score >= 0.15 || event.struggle_score >= 50) ? 'high' : 'low';
   }
   
-  // Default fallback: all detected backend events without a score are High severity
+  // Default fallback: all detected backend events are High severity for prominent demo presentation
   if (event?.detected) {
     return 'high'; 
   }

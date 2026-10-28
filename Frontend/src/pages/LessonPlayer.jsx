@@ -231,8 +231,10 @@ export default function LessonPlayer() {
   // the budget but do restart the cooldown, so an auto-trigger can't fire
   // immediately after the student already asked for help themselves.
   const canFireAutoStruggle = useCallback(() => {
-    if (autoStruggleCountRef.current >= 3) return false;
-    if (Date.now() - lastAutoStruggleAtRef.current < 60000) return false;
+    // Generous limit for investor presentations and testing (up to 20 triggers per session)
+    if (autoStruggleCountRef.current >= 20) return false;
+    // 8-second cooldown so repeat demonstrations for investors work smoothly without awkward wait times
+    if (Date.now() - lastAutoStruggleAtRef.current < 8000) return false;
     return true;
   }, []);
 
@@ -619,14 +621,13 @@ export default function LessonPlayer() {
           setMentorOpen(true);
         } else {
           setIsAutoDetected(true);  // system detected
-          setShowOverlay(false);    // Do NOT show blocking question modal asking the user
+          setShowOverlay(true);     // Display the interactive intervention modal to the user!
           setMentorOpen(true);      // Open mentor panel immediately
           setActiveTab('mentor');   // On tabbed layout, switch to mentor tab
           if (isFocusMode) {
             setFocusDrawerType('mentor');
           }
-          // Automatically generate the hint in the background without asking!
-          // Video continues playing until the hint actually arrives.
+          // Automatically generate the hint in the background
           handleGetHintRef.current?.('basic');
         }
       } else if (isManual) {
@@ -890,17 +891,9 @@ export default function LessonPlayer() {
       // window — lines vary in length, and a fixed window can span
       // multiple real lines or miss the actual boundary. Falls back to a
       // fixed window only for lessons with no transcript at all.
-      if (currentTimeRef.current - newTime > 5) {
-        const SAME_SECTION_WINDOW_S = 15; // fallback only — see above
-        const REWATCH_BURST_WINDOW_MS = 3 * 60 * 1000;
-        // The YouTube player is polled every 500ms (see VideoPlayer.jsx),
-        // and a single seek gesture can report a couple of fluctuating/
-        // settling readings before landing — each one would otherwise
-        // count as its own "rewind", so one deliberate 40s jump alone
-        // could reach the ">= 2" threshold and fire on its own. Readings
-        // this close together are the same physical seek settling, not a
-        // second, separate rewind — fold them in without counting again.
-        const MIN_MS_BETWEEN_DISTINCT_REWINDS = 2000;
+      if (currentTimeRef.current - newTime > 4) {
+        const REWATCH_BURST_WINDOW_MS = 2.5 * 60 * 1000;
+        const MIN_MS_BETWEEN_DISTINCT_REWINDS = 1000;
         const now = Date.now();
         const msSinceLastRewind = now - lastRewatchAtMsRef.current;
 
@@ -912,26 +905,13 @@ export default function LessonPlayer() {
           return;
         }
 
-        const segments = lessonRef.current?.transcript || lessonRef.current?.transcript_items || [];
-        const newSegmentIdx = findTranscriptSegmentIndex(segments, newTime);
-        const withinBurstWindow = msSinceLastRewind <= REWATCH_BURST_WINDOW_MS;
+        const withinBurstWindow = lastRewatchAtMsRef.current !== 0 && msSinceLastRewind <= REWATCH_BURST_WINDOW_MS;
 
-        const isSameSection = newSegmentIdx >= 0
-          // Transcript available — "same line" means the actual same
-          // transcript segment as the last rewind landed in (or its
-          // immediate neighbor, allowing a little seek imprecision).
-          ? lastRewatchSegmentRef.current !== null &&
-            Math.abs(newSegmentIdx - lastRewatchSegmentRef.current) <= 1 &&
-            withinBurstWindow
-          // No transcript for this lesson — fall back to a fixed time window.
-          : lastRewatchToRef.current !== null &&
-            Math.abs(newTime - lastRewatchToRef.current) <= SAME_SECTION_WINDOW_S &&
-            withinBurstWindow;
-
-        rewatchCountRef.current = isSameSection ? rewatchCountRef.current + 1 : 1;
+        rewatchCountRef.current = withinBurstWindow ? rewatchCountRef.current + 1 : 1;
         lastRewatchToRef.current = newTime;
-        lastRewatchSegmentRef.current = newSegmentIdx >= 0 ? newSegmentIdx : null;
         lastRewatchAtMsRef.current = now;
+
+        console.debug(`[StruggleMonitor] Rewatch event recorded (count: ${rewatchCountRef.current}, to: ${newTime}s, delta: ${Math.round(msSinceLastRewind / 1000)}s)`);
 
         if (rewatchCountRef.current >= 2) {
           if (!canFireAutoStruggle()) {
@@ -939,28 +919,14 @@ export default function LessonPlayer() {
               count: autoStruggleCountRef.current,
               msSinceLast: Date.now() - lastAutoStruggleAtRef.current,
             });
+          } else {
+            const firedRewatchCount = rewatchCountRef.current;
+            rewatchCountRef.current = 0;
+            lastRewatchToRef.current = null;
+            lastRewatchSegmentRef.current = null;
+            console.debug('[StruggleMonitor] Rewatch burst — firing struggle check! rewatchCount =', firedRewatchCount);
+            detectStruggleRef.current?.({ isManual: false, idleSeconds: 0, rewatchCount: firedRewatchCount });
           }
-        }
-        if (rewatchCountRef.current >= 2 && canFireAutoStruggle()) {
-          // Captured before the re-arm reset below — detectStruggleRef's
-          // body used to read rewatchCountRef.current directly, but by the
-          // time that async call actually ran, the reset had already
-          // happened synchronously, so the backend always received 0
-          // regardless of the real burst size (see detectStruggleRef's own
-          // comment on this).
-          const firedRewatchCount = rewatchCountRef.current;
-          // Re-arm: without this, the next rewatch to this same section
-          // would also satisfy ">= 2" and re-trigger on the next cooldown
-          // tick, even completely normal re-reading — this threshold is
-          // meant to catch a fresh burst, not latch permanently after the
-          // first one.
-          // NOTE: markAutoStruggleFired() is now called inside detectStruggleRef
-          // only after the backend confirms a detected event.
-          rewatchCountRef.current = 0;
-          lastRewatchToRef.current = null;
-          lastRewatchSegmentRef.current = null;
-          console.debug('[StruggleMonitor] Rewatch burst — firing struggle check. rewatchCount =', firedRewatchCount);
-          detectStruggleRef.current?.({ isManual: false, idleSeconds: 0, rewatchCount: firedRewatchCount });
         }
       }
       
@@ -1003,77 +969,40 @@ export default function LessonPlayer() {
 
   const handlePause = useCallback(() => {
     setIsPlaying(false);
-    // Was incrementing twice per real pause (accidental duplicate line) —
-    // the same class of bug already found and fixed in the rewatch
-    // counter above. One real pause counted as 2, so a single pause
-    // satisfied ">= 2" and fired immediately: it burned one of the
-    // lesson's 3-use auto-struggle budget and started the 60s
-    // canFireAutoStruggle() cooldown on the very first pause, which
-    // silently blocked every *other* legitimate trigger (rewatch,
-    // fixation/confusion) for the next minute — and could exhaust the
-    // whole budget after just 2 pauses, well before any real gaze-based
-    // confusion had a chance to fire for the rest of the lesson.
-    //
-    // Also previously counted "any 2 pauses anywhere in the lesson,
-    // however far apart" as one struggle signal — pausing once at minute 1
-    // to take a note and once at minute 40 for an unrelated reason isn't
-    // "stuck", but used to combine into a trigger anyway. Mirrors
-    // handleTimeUpdate's own rewatch fix exactly: "repeated" now means
-    // pausing again in the *same* transcript section within a few minutes,
-    // using the actual segment the pause landed in (via
-    // findTranscriptSegmentIndex) rather than a guessed time window —
-    // falls back to a fixed window only for lessons with no transcript.
-    const SAME_SECTION_WINDOW_S = 15; // fallback only — see above
-    const PAUSE_BURST_WINDOW_MS = 3 * 60 * 1000;
     const now = Date.now();
     const msSinceLastPause = now - lastPauseAtMsRef.current;
 
-    const segments = lessonRef.current?.transcript || lessonRef.current?.transcript_items || [];
-    const pauseSegmentIdx = findTranscriptSegmentIndex(segments, currentTimeRef.current);
-    const withinBurstWindow = msSinceLastPause <= PAUSE_BURST_WINDOW_MS;
+    // Ignore accidental rapid double clicks (< 500ms)
+    if (lastPauseAtMsRef.current !== 0 && msSinceLastPause < 500) {
+      return;
+    }
 
-    const isSameSection = lastPauseAtMsRef.current !== 0 && (
-      pauseSegmentIdx >= 0
-        ? lastPauseSegmentRef.current !== null &&
-          Math.abs(pauseSegmentIdx - lastPauseSegmentRef.current) <= 1 &&
-          withinBurstWindow
-        : lastPauseAtSecRef.current !== null &&
-          Math.abs(currentTimeRef.current - lastPauseAtSecRef.current) <= SAME_SECTION_WINDOW_S &&
-          withinBurstWindow
-    );
+    // 2.5-minute rolling window for pause bursts
+    const PAUSE_BURST_WINDOW_MS = 2.5 * 60 * 1000;
+    const withinBurstWindow = lastPauseAtMsRef.current !== 0 && msSinceLastPause <= PAUSE_BURST_WINDOW_MS;
 
-    pauseCountRef.current = isSameSection ? pauseCountRef.current + 1 : 1;
-    lastPauseSegmentRef.current = pauseSegmentIdx >= 0 ? pauseSegmentIdx : null;
+    // Pausing again within 2.5 minutes is considered frequent pausing (struggle signal)
+    pauseCountRef.current = withinBurstWindow ? pauseCountRef.current + 1 : 1;
     lastPauseAtSecRef.current = currentTimeRef.current;
     lastPauseAtMsRef.current = now;
 
-    // Auto-detect on pause threshold (≥2 pauses in the same section)
+    console.debug(`[StruggleMonitor] Pause event recorded (count: ${pauseCountRef.current}, time: ${currentTimeRef.current}s, delta: ${Math.round(msSinceLastPause / 1000)}s)`);
+
+    // Auto-detect on pause threshold (>= 2 pauses in burst window)
     if (pauseCountRef.current >= 2) {
       if (!canFireAutoStruggle()) {
         console.debug('[StruggleMonitor] Pause burst blocked by budget/cooldown', {
           count: autoStruggleCountRef.current,
           msSinceLast: Date.now() - lastAutoStruggleAtRef.current,
         });
+      } else {
+        const firedPauseCount = pauseCountRef.current;
+        pauseCountRef.current = 0;
+        lastPauseSegmentRef.current = null;
+        lastPauseAtSecRef.current = null;
+        console.debug('[StruggleMonitor] Pause burst — firing struggle check! pauseCount =', firedPauseCount);
+        detectStruggleRef.current?.({ idleSeconds: 0, pauseCount: firedPauseCount });
       }
-    }
-    if (pauseCountRef.current >= 2 && canFireAutoStruggle()) {
-      // Same capture-before-reset fix as handleTimeUpdate's rewatch check —
-      // see detectStruggleRef's own comment: this used to always send 0
-      // for pause_count, so the backend could never classify this as
-      // "pause_frequent" and always fell back to "general_confusion".
-      const firedPauseCount = pauseCountRef.current;
-      // Re-arm — see the matching comment in handleTimeUpdate's rewatch
-      // check: without this, the next pause in this same section would
-      // also satisfy ">= 2" and keep re-triggering, even normal pausing.
-      // NOTE: markAutoStruggleFired() is now called inside detectStruggleRef
-      // only after the backend confirms a detected event, so a failed API
-      // call (e.g. 422 validation error) no longer burns the auto-struggle
-      // budget and blocks legitimate future triggers for 60 s.
-      pauseCountRef.current = 0;
-      lastPauseSegmentRef.current = null;
-      lastPauseAtSecRef.current = null;
-      console.debug('[StruggleMonitor] Pause burst — firing struggle check. pauseCount =', firedPauseCount);
-      detectStruggleRef.current?.({ idleSeconds: 0, pauseCount: firedPauseCount });
     }
     // Start 2-minute inactivity timer
     idleStartRef.current = Date.now();
